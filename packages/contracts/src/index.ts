@@ -37,7 +37,7 @@ const tournamentPatch = z
     description: text(2000).optional(),
     status: z.enum(['draft', 'open', 'closed']),
     slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80),
-    theme: z.object({ primary: hex, accent: hex, logoAssetId: id.optional() }),
+    theme: z.object({ primary: hex, accent: hex, logoAssetId: id.optional(), logoDataUrl: z.string().max(90_000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional() }),
     publish: z.object({
       published: z.boolean(),
       autoPublishOnSync: z.boolean(),
@@ -113,7 +113,7 @@ export const payloadSchemas: Record<CommandType, z.ZodTypeAny> = {
   'category.delete': z.object({ categoryId: id }).strict(),
   'athlete.save': z.object({ athlete: athletePatch }).strict(),
   'athlete.anonymize': z.object({ athleteId: id }).strict(),
-  'pair.save': z.object({ pair: pairPatch }).strict(),
+  'pair.save': z.object({ pair: pairPatch, confirmed: z.boolean().optional() }).strict(),
   'registration.create': z.object({ registrationId: id, categoryId: id, pairId: id }).strict(),
   'registration.setStatus': z.object({ registrationId: id, status: z.enum(['pending', 'approved', 'canceled', 'waitlist']) }).strict(),
   'registration.checkIn': z.object({ registrationId: id, side: z.enum(['a', 'b']), value: z.boolean() }).strict(),
@@ -123,6 +123,14 @@ export const payloadSchemas: Record<CommandType, z.ZodTypeAny> = {
   'schedule.apply': z.object({ assignments: z.array(z.object({ matchId: id, courtId: id, scheduledAt: iso }).strict()).max(1000) }).strict(),
   'match.start': z.object({ matchId: id }).strict(),
   'match.live_score': z.object({ matchId: id, a: z.number().int().min(0).max(99), b: z.number().int().min(0).max(99) }).strict(),
+  'bracket.swap': z
+    .object({
+      categoryId: id,
+      a: z.object({ matchId: id, side: z.enum(['a', 'b']) }).strict(),
+      b: z.object({ matchId: id, side: z.enum(['a', 'b']) }).strict(),
+      confirmToken: z.string().max(64).optional(),
+    })
+    .strict(),
   'result.record': resultPayload,
   'tie.resolve': z
     .object({ tie: z.object({ id, tournamentId: id, categoryId: id, groupId: id, orderedPairIds: z.array(id).min(2).max(16), reason: text(300).min(1) }).strict() })

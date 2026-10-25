@@ -76,10 +76,8 @@ export async function buildApp(deps: AppDeps) {
     if (!p.success) return reply.code(400).send({ error: { code: 'VALIDATION', message: formatZodError(p.error) } });
     const r = await login(pool, config, p.data.email, p.data.password, req.headers['user-agent']);
     if (!r.ok) {
-      if (r.reason === 'locked') {
-        return reply.code(429).send({ error: { code: 'LOCKED', message: `Muitas tentativas. Tente de novo em ${r.retryAfterMin} minuto(s).` } });
-      }
-      return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha incorretos.' } });
+      // Mesma resposta para senha errada e conta bloqueada: não revela quais e-mails existem.
+      return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha incorretos, ou conta bloqueada por alguns minutos após muitas tentativas.' } });
     }
     reply.setCookie(SESSION_COOKIE, r.token, { httpOnly: true, sameSite: 'strict', secure: config.COOKIE_SECURE, path: '/', maxAge: config.SESSION_ABSOLUTE_DAYS * 86400 });
     return { user: { email: r.user.email, organizationId: r.user.organizationId } };

@@ -64,6 +64,7 @@ export function PublicView({ snapshot, embedded }: { snapshot: PublicSnapshot; e
   return (
     <div style={{ maxWidth: '60rem', margin: '0 auto', padding: '1rem', ...(embedded ? ({ ['--amber']: snapshot.theme.accentOnLight, ['--on-amber']: '#ffffff' } as Record<string, string>) : {}) }}>
       <header>
+        {snapshot.theme.logoDataUrl && <img src={snapshot.theme.logoDataUrl} alt={`Logotipo de ${t.organizationName}`} style={{ maxHeight: '4.5rem', maxWidth: '12rem', objectFit: 'contain' }} />}
         <p className="muted small">{t.organizationName}</p>
         <Title>{t.name}</Title>
         <p>{t.city} · {t.venue} · {fmtD.format(new Date(`${t.startDate}T12:00:00-03:00`))}{t.endDate !== t.startDate ? ` a ${fmtD.format(new Date(`${t.endDate}T12:00:00-03:00`))}` : ''}</p>

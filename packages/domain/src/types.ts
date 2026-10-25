@@ -47,6 +47,8 @@ export interface Theme {
   primary: string;
   accent: string;
   logoAssetId?: Id;
+  /** Logotipo reduzido (PNG/JPEG/WebP em data URL, até ~90 KB). Vai para a página pública. */
+  logoDataUrl?: string;
 }
 
 export interface Tournament {

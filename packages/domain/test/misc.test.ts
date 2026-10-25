@@ -137,3 +137,11 @@ test('relatórios CSV: cabeçalho com torneio, categoria e data; sem fórmulas; 
   assert.ok(podiumCsv(s, at).includes('Ainda não definido'));
   assert.ok(bracketCsv(s, at).includes('Final'));
 });
+
+test('logotipo: vai para o snapshot público só se o torneio estiver publicado, sem outros campos privados', () => {
+  let s = setup({ pairs: 2 });
+  const logo = 'data:image/png;base64,iVBORw0KGgo=';
+  s = run(s, { type: 'tournament.save', payload: { tournament: { id: 't1', theme: { ...s.tournament!.theme, logoDataUrl: logo }, publish: { ...s.tournament!.publish, published: true } } } });
+  const snap = buildPublicSnapshot(s, 'x')!;
+  assert.equal(snap.theme.logoDataUrl, logo);
+});

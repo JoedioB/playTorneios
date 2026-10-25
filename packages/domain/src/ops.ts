@@ -24,12 +24,13 @@ export type Command =
   | { type: 'category.delete'; payload: { categoryId: Id } }
   | { type: 'athlete.save'; payload: { athlete: Patch<Athlete> } }
   | { type: 'athlete.anonymize'; payload: { athleteId: Id } }
-  | { type: 'pair.save'; payload: { pair: Patch<Pair> } }
+  | { type: 'pair.save'; payload: { pair: Patch<Pair>; confirmed?: boolean } }
   | { type: 'registration.create'; payload: { registrationId: Id; categoryId: Id; pairId: Id } }
   | { type: 'registration.setStatus'; payload: { registrationId: Id; status: RegistrationStatus } }
   | { type: 'registration.checkIn'; payload: { registrationId: Id; side: 'a' | 'b'; value: boolean } }
   | { type: 'registration.setSeed'; payload: { registrationId: Id; seed: number | null } }
   | { type: 'bracket.generate'; payload: { categoryId: Id; seed: number; confirmToken?: string } }
+  | { type: 'bracket.swap'; payload: { categoryId: Id; a: { matchId: Id; side: 'a' | 'b' }; b: { matchId: Id; side: 'a' | 'b' }; confirmToken?: string } }
   | { type: 'match.schedule'; payload: { matchId: Id; courtId: Id | null; scheduledAt: string | null } }
   | { type: 'schedule.apply'; payload: { assignments: Assignment[] } }
   | { type: 'match.start'; payload: { matchId: Id } }
@@ -68,6 +69,7 @@ export const COMMAND_TYPES: CommandType[] = [
   'registration.checkIn',
   'registration.setSeed',
   'bracket.generate',
+  'bracket.swap',
   'match.schedule',
   'schedule.apply',
   'match.start',
@@ -114,6 +116,8 @@ export function commandTarget(cmd: Command): Target {
     case 'registration.setSeed':
       return { entityType: 'registration', entityId: cmd.payload.registrationId, fields: ['seed'] };
     case 'bracket.generate':
+      return { entityType: 'bracket', entityId: cmd.payload.categoryId, fields: ['*'] };
+    case 'bracket.swap':
       return { entityType: 'bracket', entityId: cmd.payload.categoryId, fields: ['*'] };
     case 'match.schedule':
       return { entityType: 'match', entityId: cmd.payload.matchId, fields: ['courtId', 'scheduledAt'] };

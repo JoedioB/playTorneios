@@ -38,4 +38,13 @@ delete from sync_halts where starts_with(key, 't-aaa/');
 delete from tournament_states where tournament_id = 't-aaa';
 select count(*) as outros_torneios_intactos from entity_versions where key = 't-bbb/court/q1';
 select count(*) as snapshots_restantes from public_snapshots;
+
+-- bloqueio de login atômico e purge de sessões
+insert into users(id, organization_id, email, password_hash) values ('33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','a@b.c','x');
+update users set failed_logins = 4 where id = '33333333-3333-3333-3333-333333333333';
+update users set failed_logins = case when failed_logins + 1 >= 5 then 0 else failed_logins + 1 end, locked_until = case when failed_logins + 1 >= 5 then now() + ('15' || ' minutes')::interval else locked_until end where id = '33333333-3333-3333-3333-333333333333';
+select failed_logins, locked_until > now() as bloqueado from users where id = '33333333-3333-3333-3333-333333333333';
+insert into sessions(token_hash,user_id,expires_at,last_seen_at) values ('old','33333333-3333-3333-3333-333333333333', now() - interval '1 day', now()), ('ok','33333333-3333-3333-3333-333333333333', now() + interval '1 day', now());
+delete from sessions where expires_at < now() or last_seen_at < now() - ('8' || ' hours')::interval;
+select token_hash as sessoes_restantes from sessions;
 rollback;

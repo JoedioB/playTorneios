@@ -270,3 +270,15 @@ test('dispatch concorrente com pull não perde a edição (serialização)', asy
   assert.equal(serverCanon(store), clientCanon(c.engine.state));
   assert.equal(c.engine.outbox.length, 0);
 });
+
+test('operação bloqueada sem causa local volta para a fila na próxima rodada', async () => {
+  const store = new MemoryServerStore();
+  const c = makeClient(store, mulberry32(40), 'd1', { offline: true });
+  await c.engine.init();
+  const cmds = boot();
+  await c.engine.dispatch(cmds[0] as Command);
+  c.engine.outbox[0]!.status = 'blocked'; // bloqueio velho, sem conflito nem rejeição na entidade
+  await drain(c);
+  assert.equal(c.engine.outbox.length, 0);
+  assert.equal(serverCanon(store), clientCanon(c.engine.state));
+});

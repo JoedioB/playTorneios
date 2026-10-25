@@ -16,6 +16,7 @@ import { RelatoriosScreen, SistemaScreen } from './screens/sistema.tsx';
 import { SyncScreen } from './screens/sync.tsx';
 import { Onboarding, TorneioScreen } from './screens/torneio.tsx';
 import { LockGate } from './ui/lockgate.tsx';
+import { TabGuard } from './ui/tabguard.tsx';
 import { Shell } from './ui/shell.tsx';
 import { ToastRegion } from './ui/kit.tsx';
 
@@ -52,7 +53,7 @@ export function App() {
     try { localStorage.removeItem(SESSION_KEY); } catch { /* sem armazenamento */ }
     location.reload();
   };
-  return <LockGate onSignOut={() => void out()}><AppInner /></LockGate>;
+  return <TabGuard><LockGate onSignOut={() => void out()}><AppInner /></LockGate></TabGuard>;
 }
 
 function AppInner() {

@@ -1356,10 +1356,17 @@ Duas revisões independentes (conformidade e código) foram feitas. Conformidade
 
 **Verificado em Postgres 16 real nesta sessão:** a migração `001_init.sql` aplica sem erro e as consultas de `pg-store`/`app.ts` (upserts, `starts_with`, junções por organização, troca de slug com `on update cascade`, exclusão LGPD) se comportam como esperado, inclusive "curinga não vaza entre torneios". O driver `pg` e o Fastify não puderam ser instalados, então o código TypeScript da API continua sem execução real.
 
+**Corrigido na terceira rodada:** editar atleta e dupla (troca de atleta com partidas iniciadas exige confirmação e fica na auditoria, `pair.athlete_changed`); critérios de desempate editáveis e ordenáveis na categoria; ação "Trocar posições" na chave (`bracket.swap`, com análise de impacto e confirmação quando há resultados; refazer o sorteio desfaz trocas manuais); logotipo (reduzido no aparelho, vai para a página pública e para o PDF).
+
+**Corrigido na quarta rodada:** operações `blocked` sem causa local voltam sozinhas para a fila; uma aba por vez (`navigator.locks`) com aviso na segunda aba; contagem de falhas de login atômica e resposta única (401) para senha errada ou conta bloqueada (não revela e-mails); purge de sessões expiradas a cada hora. Consultas de bloqueio e purge validadas em Postgres 16 real.
+
+**Medido na quinta rodada:**
+- Orçamento de JavaScript (esbuild minificado, sem Dexie, pdf-lib e fontes, que são carregados à parte): página pública 61 kB gzip (meta 80 kB); painel 130 kB gzip (meta 250 kB). Os números finais dependem do build real do Vite.
+- Contraste: teste automático (`apps/web/test/contrast.test.ts`) das cores do tema escuro e do claro. Achou `--line` com 2,91:1 sobre `surf2` (meta 3:1); corrigido para `#6a7a8e`.
+
 **Pendente (ordem sugerida):**
 1. `pnpm-lock.yaml` (gerar no primeiro `pnpm install`) e testes de API com `app.inject()` e Postgres no CI.
-2. Upload de logotipo; critérios de desempate editáveis; "Trocar posições" e posições protegidas na chave; editar atleta e dupla.
-3. Operações `blocked` por conflito de outro aparelho sem reenvio automático; bloqueio entre abas (`navigator.locks`).
-4. TLS na stack (cookie `Secure`), lockout por IP, expurgo de sessões antigas, retenção de dados.
-5. axe no CI, auditoria manual (NVDA, VoiceOver, zoom) e medição dos orçamentos de desempenho.
-6. Desvios não declarados no Apêndice D: `pdf-lib` no lugar de `pdfmake`; tema ajusta cor em vez de rejeitar; snapshot sem histórico; toasts de 6 s.
+2. TLS na stack (cookie `Secure`; hoje exige proxy HTTPS à frente), política de retenção de dados pessoais (decisão do responsável legal) e limite de login por IP além do rate limit.
+3. Posições protegidas por posição fixa (hoje só por semente).
+4. axe no CI e auditoria manual (NVDA, VoiceOver, zoom 200% e 400%); Lighthouse e abertura offline em menos de 2 s.
+5. Desvios não declarados no Apêndice D: `pdf-lib` no lugar de `pdfmake`; tema ajusta cor em vez de rejeitar; snapshot sem histórico; toasts de 6 s.

@@ -3,6 +3,7 @@ import { contrastRatio, deriveTheme } from '@playtorneios/domain';
 import type { Tournament } from '@playtorneios/domain';
 import { useRuntime } from '../data/runtime.tsx';
 import { uuid } from '../lib/format.ts';
+import { resizeLogo } from '../lib/logo.ts';
 import { Button, Field, PageHead } from '../ui/kit.tsx';
 
 function slugify(s: string): string {
@@ -45,15 +46,15 @@ export function Onboarding() {
 }
 
 export function TorneioScreen() {
-  const { state, run } = useRuntime();
+  const { state, run, toast } = useRuntime();
   const t = state.tournament as Tournament;
-  const [f, setF] = useState({ name: t.name, organizationName: t.organizationName, city: t.city, venue: t.venue, startDate: t.startDate, endDate: t.endDate, description: t.description ?? '', slug: t.slug, matchDurationMin: String(t.defaults.matchDurationMin), restMin: String(t.defaults.restMin), primary: t.theme.primary, accent: t.theme.accent });
+  const [f, setF] = useState({ name: t.name, organizationName: t.organizationName, city: t.city, venue: t.venue, startDate: t.startDate, endDate: t.endDate, description: t.description ?? '', slug: t.slug, matchDurationMin: String(t.defaults.matchDurationMin), restMin: String(t.defaults.restMin), primary: t.theme.primary, accent: t.theme.accent, logo: t.theme.logoDataUrl ?? '' });
   const d = deriveTheme(f.primary, f.accent);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
   const save = () =>
     run({
       type: 'tournament.save',
-      payload: { tournament: { id: t.id, name: f.name.trim(), organizationName: f.organizationName.trim(), city: f.city.trim(), venue: f.venue.trim(), startDate: f.startDate, endDate: f.endDate, description: f.description.trim() || undefined, slug: f.slug, defaults: { matchDurationMin: Number(f.matchDurationMin), restMin: Number(f.restMin) }, theme: { ...t.theme, primary: f.primary, accent: f.accent } } },
+      payload: { tournament: { id: t.id, name: f.name.trim(), organizationName: f.organizationName.trim(), city: f.city.trim(), venue: f.venue.trim(), startDate: f.startDate, endDate: f.endDate, description: f.description.trim() || undefined, slug: f.slug, defaults: { matchDurationMin: Number(f.matchDurationMin), restMin: Number(f.restMin) }, theme: { ...t.theme, primary: f.primary, accent: f.accent, logoDataUrl: f.logo || undefined } } },
     }, 'Dados do torneio salvos.');
   return (
     <>
@@ -76,6 +77,17 @@ export function TorneioScreen() {
           <div className="form-grid">
             <Field label="Cor principal">{(p) => <input {...p} type="color" value={f.primary} onChange={set('primary')} />}</Field>
             <Field label="Cor de destaque">{(p) => <input {...p} type="color" value={f.accent} onChange={set('accent')} />}</Field>
+          </div>
+          <div className="stack">
+            <Field label="Logotipo (opcional)" hint="PNG, JPEG ou WebP. É reduzido neste aparelho e aparece na página pública.">
+              {(p) => <input {...p} type="file" accept="image/png,image/jpeg,image/webp" onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try { const url = await resizeLogo(file); setF((x) => ({ ...x, logo: url })); }
+                catch (err) { toast({ text: err instanceof Error ? err.message : 'Não foi possível usar esta imagem.', kind: 'err' }); }
+              }} />}
+            </Field>
+            {f.logo && <div className="row"><img src={f.logo} alt="Prévia do logotipo" style={{ maxHeight: '4rem' }} /><button className="btn" type="button" onClick={() => setF((x) => ({ ...x, logo: '' }))}>Remover logotipo</button></div>}
           </div>
           <p className="small" role="status">
             Texto sobre a cor principal: {contrastRatio(d.primary, d.onPrimary).toFixed(1)}:1.{' '}

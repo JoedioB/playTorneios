@@ -38,6 +38,10 @@ export function ChavesScreen() {
   const [seedInput, setSeedInput] = useState('');
   const [impact, setImpact] = useState<{ report: ImpactReport; seed: number } | null>(null);
   const [error, setError] = useState('');
+  const [swapOpen, setSwapOpen] = useState(false);
+  const [swapA, setSwapA] = useState('');
+  const [swapB, setSwapB] = useState('');
+  const [swapImpact, setSwapImpact] = useState<ImpactReport | null>(null);
   const matches = useMemo(() => (cid ? categoryMatches(state, cid) : []), [state, cid]);
   const knock = matches.filter((m) => m.phase === 'knockout');
   const rounds = [...new Set(knock.map((m) => m.round))].sort((a, b) => a - b);
@@ -54,6 +58,29 @@ export function ChavesScreen() {
       if (e instanceof DomainError && e.code === 'IMPACT_CONFIRMATION_REQUIRED') { setGenOpen(false); setImpact({ report: e.details as ImpactReport, seed }); return; }
       if (e instanceof DomainError && e.code === 'IMPACT_BLOCKING') { setGenOpen(false); setImpact({ report: e.details as ImpactReport, seed }); return; }
       setError(e instanceof DomainError ? e.message : 'Não foi possível gerar a chave.');
+    }
+  };
+  // Posições trocáveis: lados do mata-mata que já têm dupla definida.
+  const positions = useMemo(() => {
+    const out: Array<{ value: string; label: string }> = [];
+    for (const m of matches.filter((x) => x.phase === 'knockout')) {
+      for (const side of ['a', 'b'] as const) {
+        const slot = side === 'a' ? m.slotA : m.slotB;
+        if (slot.kind === 'pair') out.push({ value: `${m.id}|${side}`, label: `${m.label}, lado ${side === 'a' ? 'A' : 'B'}: ${pairName(state, slot.pairId)}` });
+      }
+    }
+    return out;
+  }, [matches, state]);
+  const doSwap = async (token?: string) => {
+    const [ma, sa] = swapA.split('|');
+    const [mb, sb] = swapB.split('|');
+    try {
+      await engine.dispatch({ type: 'bracket.swap', payload: { categoryId: cid, a: { matchId: ma as string, side: sa as 'a' | 'b' }, b: { matchId: mb as string, side: sb as 'a' | 'b' }, ...(token ? { confirmToken: token } : {}) } });
+      toast({ text: 'Posições trocadas. A troca ficou registrada na auditoria.', kind: 'ok' });
+      setSwapOpen(false); setSwapImpact(null); setSwapA(''); setSwapB('');
+    } catch (e) {
+      if (e instanceof DomainError && (e.code === 'IMPACT_CONFIRMATION_REQUIRED' || e.code === 'IMPACT_BLOCKING')) { setSwapOpen(false); setSwapImpact(e.details as ImpactReport); return; }
+      setError(e instanceof DomainError ? e.message : 'Não foi possível trocar as posições.');
     }
   };
   const start = () => {
@@ -88,7 +115,10 @@ export function ChavesScreen() {
   return (
     <>
       <PageHead title="Chaves" sub={cat ? `${cat.name} · ${approved} dupla(s) aprovada(s)` : undefined}
-        actions={<Button variant="primary" icon="bracket" disabled={approved < 2} onClick={() => { setError(''); setGenOpen(true); }}>{matches.length ? 'Refazer sorteio' : 'Gerar chave'}</Button>} />
+        actions={<>
+          {positions.length >= 2 && <Button icon="sync" onClick={() => { setError(''); setSwapOpen(true); }}>Trocar posições</Button>}
+          <Button variant="primary" icon="bracket" disabled={approved < 2} onClick={() => { setError(''); setGenOpen(true); }}>{matches.length ? 'Refazer sorteio' : 'Gerar chave'}</Button>
+        </>} />
       <div className="row">
         <Field label="Categoria">{(p) => <select {...p} value={cid} onChange={(e) => go(`/chaves/${e.target.value}`)}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
         <div className="tabs" role="group" aria-label="Modo de exibição">
@@ -143,6 +173,16 @@ export function ChavesScreen() {
           ))}
         </div>
       )}
+      <Dialog open={swapOpen} title="Trocar posições na chave" onClose={() => setSwapOpen(false)}
+        footer={<><Button onClick={() => setSwapOpen(false)}>Cancelar</Button><Button variant="primary" icon="check" disabled={!swapA || !swapB || swapA === swapB} onClick={() => void doSwap()}>Trocar</Button></>}>
+        <div className="stack">
+          <p className="muted">As duas duplas escolhidas trocam de lugar. Se isso afetar resultados ou horários, mostramos o impacto antes de aplicar. Refazer o sorteio desfaz trocas manuais.</p>
+          {error && <p className="error" role="alert">{error}</p>}
+          <Field label="Primeira posição">{(p) => <select {...p} value={swapA} onChange={(e) => setSwapA(e.target.value)}><option value="">Escolha…</option>{positions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>}</Field>
+          <Field label="Segunda posição">{(p) => <select {...p} value={swapB} onChange={(e) => setSwapB(e.target.value)}><option value="">Escolha…</option>{positions.filter((o) => o.value !== swapA).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>}</Field>
+        </div>
+      </Dialog>
+      <ImpactDialog report={swapImpact} title="Trocar posições afeta a chave" confirmLabel="Trocar mesmo assim" keepLabel="Manter como está" onConfirm={() => void doSwap(swapImpact?.token)} onCancel={() => setSwapImpact(null)} />
       <Dialog open={genOpen} title={matches.length ? 'Refazer sorteio' : 'Gerar chave'} onClose={() => setGenOpen(false)}
         footer={<><Button onClick={() => setGenOpen(false)}>Cancelar</Button><Button variant="primary" icon="check" onClick={start}>{matches.length ? 'Ver o que muda' : 'Gerar chave'}</Button></>}>
         <form className="stack" onSubmit={(e) => { e.preventDefault(); start(); }}>

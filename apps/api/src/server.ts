@@ -7,6 +7,15 @@ const pool = createPool(config.DATABASE_URL);
 await migrate(pool, (m) => console.log(m));
 const app = await buildApp({ pool, config });
 
+// Higiene de sessões: remove as expiradas (absoluto ou por inatividade) uma vez por hora.
+const purgeSessions = () =>
+  pool
+    .query(`delete from sessions where expires_at < now() or last_seen_at < now() - ($1 || ' hours')::interval`, [String(config.SESSION_IDLE_HOURS ?? 8)])
+    .catch((e) => console.error('purge de sessões falhou', e.message));
+void purgeSessions();
+const purgeTimer = setInterval(purgeSessions, 3_600_000);
+purgeTimer.unref();
+
 const stop = async () => {
   await app.close();
   await pool.end();

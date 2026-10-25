@@ -33,7 +33,7 @@ export interface PublicSnapshot {
   schemaVersion: 1;
   generatedAt: string;
   tournament: { name: string; organizationName: string; startDate: string; endDate: string; city: string; venue: string; description?: string; slug: string; status: string };
-  theme: DerivedTheme;
+  theme: DerivedTheme & { logoDataUrl?: string };
   categories: PublicCategory[];
 }
 
@@ -112,7 +112,7 @@ export function buildPublicSnapshot(state: TournamentState, generatedAt: string)
     schemaVersion: 1,
     generatedAt,
     tournament: { name: t.name, organizationName: t.organizationName, startDate: t.startDate, endDate: t.endDate, city: t.city, venue: t.venue, description: t.description, slug: t.slug, status: t.status },
-    theme: deriveTheme(t.theme.primary, t.theme.accent),
+    theme: { ...deriveTheme(t.theme.primary, t.theme.accent), ...(t.theme.logoDataUrl ? { logoDataUrl: t.theme.logoDataUrl } : {}) },
     categories,
   };
 }

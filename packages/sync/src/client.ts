@@ -254,6 +254,15 @@ export class SyncEngine {
 
   private async round(): Promise<void> {
     const { storage, transport } = this.opt;
+    // Operação "bloqueada" sem nenhuma pendência de conflito/rejeição na mesma entidade é bloqueio velho
+    // (ex.: a causa foi resolvida em outra rodada): volta para a fila em vez de ficar parada para sempre.
+    for (const b of this.outbox.filter((i) => i.status === 'blocked')) {
+      const cause = this.outbox.some((o) => (o.status === 'conflict' || o.status === 'rejected') && o.op.entityType === b.op.entityType && o.op.entityId === b.op.entityId);
+      if (!cause) {
+        b.status = 'pending';
+        await storage.saveOutboxItem(b);
+      }
+    }
     for (;;) {
       const batch = this.outbox.filter((i) => i.status === 'pending').slice(0, BATCH_SIZE);
       if (batch.length === 0) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describeRule, validateFormat } from '@playtorneios/domain';
-import type { Category, ScoringRule } from '@playtorneios/domain';
+import type { Category, ScoringRule, TiebreakerKey } from '@playtorneios/domain';
 import { useRuntime } from '../data/runtime.tsx';
 import { FORMAT_LABEL, GENDER_LABEL, LEVEL_LABEL, uuid } from '../lib/format.ts';
 import { Button, Dialog, Empty, Field, PageHead, StatusBadge } from '../ui/kit.tsx';
@@ -8,10 +8,18 @@ import { Button, Dialog, Empty, Field, PageHead, StatusBadge } from '../ui/kit.t
 interface Form {
   id: string; name: string; level: string; gender: string; format: Category['format']; groups: string; advance: string;
   bestOf: string; setPoints: string; decidingPoints: string; groupTarget: string; groupCap: string;
-  capacity: string; waitlist: boolean; third: boolean; ageMin: string; ageMax: string; wo: boolean;
+  capacity: string; waitlist: boolean; third: boolean; ageMin: string; ageMax: string; wo: boolean; tb: TiebreakerKey[];
 }
 
-const blank = (): Form => ({ id: uuid(), name: '', level: '', gender: '', format: 'single_elimination', groups: '2', advance: '2', bestOf: '3', setPoints: '18', decidingPoints: '15', groupTarget: '18', groupCap: '21', capacity: '', waitlist: false, third: false, ageMin: '', ageMax: '', wo: false });
+const TB_OPTIONS: Array<{ key: TiebreakerKey; label: string }> = [
+  { key: 'head_to_head', label: 'Confronto direto' },
+  { key: 'set_diff', label: 'Saldo de sets' },
+  { key: 'point_diff', label: 'Saldo de pontos' },
+  { key: 'points_for', label: 'Pontos feitos' },
+];
+const DEFAULT_TB: TiebreakerKey[] = ['head_to_head', 'set_diff', 'point_diff'];
+
+const blank = (): Form => ({ id: uuid(), name: '', level: '', gender: '', format: 'single_elimination', groups: '2', advance: '2', bestOf: '3', setPoints: '18', decidingPoints: '15', groupTarget: '18', groupCap: '21', capacity: '', waitlist: false, third: false, ageMin: '', ageMax: '', wo: false, tb: DEFAULT_TB });
 
 function fromCategory(c: Category): Form {
   const k = c.scoring;
@@ -23,6 +31,7 @@ function fromCategory(c: Category): Form {
     groupTarget: String(g?.model === 'target' ? g.targetPoints : 18), groupCap: String(g?.model === 'target' ? (g.cap ?? '') : ''),
     capacity: c.capacity ? String(c.capacity) : '', waitlist: c.waitlistEnabled, third: c.thirdPlaceMatch,
     ageMin: c.ageRange?.min !== undefined ? String(c.ageRange.min) : '', ageMax: c.ageRange?.max !== undefined ? String(c.ageRange.max) : '', wo: c.woCredit !== 'none',
+    tb: c.tiebreakers.filter((k) => TB_OPTIONS.some((o) => o.key === k)),
   };
 }
 
@@ -71,6 +80,7 @@ export function CategoriasScreen() {
         scoring: form.format === 'single_elimination' ? sc.scoring : sc.scoring,
         groupScoring: form.format === 'groups_then_knockout' ? sc.groupScoring : undefined,
         thirdPlaceMatch: form.third,
+        tiebreakers: form.tb,
         woCredit: form.wo ? { winnerPoints: 18, loserPoints: 0 } : 'none',
       });
     }
@@ -136,6 +146,25 @@ export function CategoriasScreen() {
                 )}
               </div>
             </fieldset>
+            {form.format === 'groups_then_knockout' && (
+              <fieldset className="card"><legend><h3>Critérios de desempate (nesta ordem)</h3></legend>
+                <p className="small muted">Vitórias vêm sempre primeiro. Se ainda houver empate, o organizador decide a ordem manualmente e o motivo fica registrado.</p>
+                <ol className="stack" style={{ listStyle: 'none', padding: 0 }}>
+                  {[...form.tb, ...TB_OPTIONS.map((o) => o.key).filter((k) => !form.tb.includes(k))].map((k) => {
+                    const on = form.tb.includes(k);
+                    const idx = form.tb.indexOf(k);
+                    const label = TB_OPTIONS.find((o) => o.key === k)?.label ?? k;
+                    const move = (d: -1 | 1) => setForm((x) => { if (!x) return x; const a = [...x.tb]; const j = idx + d; if (j < 0 || j >= a.length) return x; [a[idx], a[j]] = [a[j] as TiebreakerKey, a[idx] as TiebreakerKey]; return { ...x, tb: a }; });
+                    return (
+                      <li key={k} className="row">
+                        <label className="check"><input type="checkbox" disabled={locked} checked={on} onChange={(e) => setForm((x) => x && { ...x, tb: e.target.checked ? [...x.tb, k] : x.tb.filter((y) => y !== k) })} />{label}{on ? ` (${idx + 1}º)` : ''}</label>
+                        {on && <><Button size="sm" disabled={locked || idx === 0} label={`Subir ${label}`} onClick={() => move(-1)}>↑</Button><Button size="sm" disabled={locked || idx === form.tb.length - 1} label={`Descer ${label}`} onClick={() => move(1)}>↓</Button></>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </fieldset>
+            )}
             <label className="check"><input type="checkbox" checked={form.waitlist} onChange={(e) => setForm({ ...form, waitlist: e.target.checked })} />Usar lista de espera quando lotar</label>
             <label className="check"><input type="checkbox" disabled={locked} checked={form.third} onChange={(e) => setForm({ ...form, third: e.target.checked })} />Disputa de 3º lugar</label>
             {form.format === 'groups_then_knockout' && <label className="check"><input type="checkbox" disabled={locked} checked={form.wo} onChange={(e) => setForm({ ...form, wo: e.target.checked })} />Creditar 18 x 0 nos totais da fase de grupos em caso de W.O.</label>}

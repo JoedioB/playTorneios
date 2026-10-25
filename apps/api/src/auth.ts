@@ -38,12 +38,14 @@ export async function login(pool: Pool, cfg: Config, email: string, password: st
   }
   const good = await argon2.verify(u.password_hash, password).catch(() => false);
   if (!good) {
-    const failed = (u.failed_logins as number) + 1;
-    if (failed >= MAX_FAILED) {
-      await pool.query(`update users set failed_logins = 0, locked_until = now() + interval '${LOCK_MINUTES} minutes' where id = $1`, [u.id]);
-    } else {
-      await pool.query('update users set failed_logins = $2 where id = $1', [u.id, failed]);
-    }
+    // Contagem atômica: tentativas paralelas não furam o limite.
+    await pool.query(
+      `update users set
+         failed_logins = case when failed_logins + 1 >= $2 then 0 else failed_logins + 1 end,
+         locked_until = case when failed_logins + 1 >= $2 then now() + ($3 || ' minutes')::interval else locked_until end
+       where id = $1`,
+      [u.id, MAX_FAILED, String(LOCK_MINUTES)],
+    );
     return { ok: false, reason: 'invalid' };
   }
   await pool.query('update users set failed_logins = 0, locked_until = null where id = $1', [u.id]);

@@ -54,3 +54,17 @@ As regras de dependência entre pastas são verificadas por `test/architecture.t
 ## Primeiro uso
 
 Rode `pnpm install` uma vez e **faça commit do `pnpm-lock.yaml`** (o CI e as imagens usam instalação congelada).
+
+## Primeira subida: roteiro de verificação
+
+Nada da camada de API (Fastify, `pg`, argon2) e do build do Vite foi executado antes da entrega: foram checados por tipos e, no caso do SQL, contra um Postgres 16. Siga na ordem e pare no primeiro passo que falhar.
+
+1. `pnpm install` (gera o `pnpm-lock.yaml`; faça commit dele).
+2. `pnpm typecheck && pnpm lint && pnpm test` — esperado: tudo verde (68 testes).
+3. `cp .env.example .env` e preencha `POSTGRES_PASSWORD` e `COOKIE_SECRET` (32+ caracteres).
+4. `docker compose up --build` — esperado: `db` saudável, `migrate` termina com código 0, `api` em `/api/health`, `web` em `http://localhost:8080`.
+5. Crie a primeira conta com `ALLOW_SIGNUP=true` (depois volte para `false`), entre, crie um torneio e confira o chip de sincronização.
+6. `pnpm test:web` — teste de fumaça no navegador (precisa de `pnpm exec playwright install chromium`).
+7. Desligue a rede do navegador, registre um placar, religue: a fila deve esvaziar sozinha.
+
+Se algo falhar, anote o comando, a saída completa e `docker compose logs api` — é o material necessário para corrigir.

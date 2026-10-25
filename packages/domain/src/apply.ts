@@ -126,6 +126,20 @@ function markInvalid(s: TournamentState, ctx: ApplyContext, matchIds: Id[], by: 
   }
 }
 
+/** Dupla com partida em andamento ou finalizada em alguma categoria (RF-05). */
+export function pairHasStartedMatches(s: TournamentState, pairId: Id): boolean {
+  const cats = new Set(Object.values(s.registrations).filter((r) => r.pairId === pairId).map((r) => r.categoryId));
+  for (const cid of cats) {
+    const res = resolveCategory(s, cid).matches;
+    for (const m of categoryMatches(s, cid)) {
+      const r = res[m.id];
+      const mine = (r?.a.kind === 'pair' && r.a.pairId === pairId) || (r?.b.kind === 'pair' && r.b.pairId === pairId);
+      if (mine && m.lifecycle !== 'not_started') return true;
+    }
+  }
+  return false;
+}
+
 /** Sobreposição de quadra ou de dupla nunca é salva (regra 5); descanso curto vira aviso. */
 function guardSchedule(before: TournamentState, after: TournamentState, touched: Id[], warnings: string[]): void {
   const known = new Set(detectScheduleIssues(before).map((i) => `${i.code}:${i.matchIds.join(',')}`));
@@ -371,8 +385,13 @@ export function apply(state: TournamentState, cmd: Command, ctx: ApplyContext): 
       const key = [merged.athleteAId, merged.athleteBId].sort().join('|');
       const dup = Object.values(s.pairs).find((x) => x.id !== merged.id && [x.athleteAId, x.athleteBId].sort().join('|') === key);
       if (dup) fail('PAIR_DUPLICATE', 'Esta dupla já existe.', { pairId: dup.id });
+      const swapped = !!prev && (prev.athleteAId !== merged.athleteAId || prev.athleteBId !== merged.athleteBId);
+      if (swapped && pairHasStartedMatches(s, merged.id) && !cmd.payload.confirmed) {
+        fail('PAIR_CHANGE_CONFIRMATION_REQUIRED', 'Esta dupla já tem partidas iniciadas. Trocar um atleta não altera os resultados já registrados; confirme para continuar.');
+      }
       merged.searchKey = pairSearchKey(s, merged);
       s.pairs[merged.id] = merged;
+      if (swapped) audit(s, ctx, { entityType: 'pair', entityId: merged.id, action: 'pair.athlete_changed', before: { athleteAId: prev!.athleteAId, athleteBId: prev!.athleteBId }, after: { athleteAId: merged.athleteAId, athleteBId: merged.athleteBId } });
       break;
     }
     case 'registration.create': {
@@ -478,6 +497,43 @@ export function apply(state: TournamentState, cmd: Command, ctx: ApplyContext): 
       s.categories[categoryId] = { ...category, lockedAt: category.lockedAt ?? ctx.now, updatedAt: ctx.now };
       audit(s, ctx, { entityType: 'bracket', entityId: categoryId, action: exists ? 'bracket.regenerated' : 'bracket.generated', after: { seed, size: plan.meta.size, byes: plan.meta.byes }, reason: report.lines.join(' ') || undefined });
       if (plan.meta.byes > 0) warnings.push(`${plan.meta.byes} vaga(s) de bye: as melhores sementes avançam sem jogar.`);
+      break;
+    }
+    case 'bracket.swap': {
+      const { categoryId, a, b, confirmToken } = cmd.payload;
+      need(s.categories[categoryId], 'CATEGORY_NOT_FOUND', 'Categoria não encontrada.');
+      const meta = need(s.brackets[categoryId], 'BRACKET_NOT_FOUND', 'Gere a chave antes de trocar posições.');
+      const ma = need(s.matches[a.matchId], 'MATCH_NOT_FOUND', 'Partida não encontrada.');
+      const mb = need(s.matches[b.matchId], 'MATCH_NOT_FOUND', 'Partida não encontrada.');
+      if (ma.categoryId !== categoryId || mb.categoryId !== categoryId) fail('SWAP_INVALID', 'As duas posições precisam ser da mesma categoria.');
+      if (ma.phase !== 'knockout' || mb.phase !== 'knockout') fail('SWAP_INVALID', 'Só é possível trocar posições do mata-mata.');
+      if (ma.id === mb.id && a.side === b.side) fail('SWAP_INVALID', 'Escolha duas posições diferentes.');
+      const slotOf = (m: Match, side: 'a' | 'b') => (side === 'a' ? m.slotA : m.slotB);
+      const sa = slotOf(ma, a.side);
+      const sb = slotOf(mb, b.side);
+      if (sa.kind !== 'pair' || sb.kind !== 'pair') fail('SWAP_INVALID', 'Só é possível trocar posições que já têm dupla.');
+      const copies: Record<Id, Match> = {};
+      for (const m of categoryMatches(s, categoryId)) copies[m.id] = { ...m };
+      const put = (m: Match, side: 'a' | 'b', slot: Match['slotA']) => {
+        const c = copies[m.id] as Match;
+        if (side === 'a') c.slotA = slot;
+        else c.slotB = slot;
+      };
+      put(ma, a.side, sb);
+      put(mb, b.side, sa);
+      const plan = { matches: Object.values(copies), meta } as unknown as BracketPlan;
+      const report = analyzeBracketChange(s, categoryId, plan, ctx.now);
+      requireConfirmation(report, confirmToken);
+      Object.assign(s, applyPlanToState(s, categoryId, plan, ctx.now));
+      markInvalid(s, ctx, report.invalidated.map((i) => i.matchId), 'bracket_change');
+      audit(s, ctx, {
+        entityType: 'bracket',
+        entityId: categoryId,
+        action: 'bracket.swapped',
+        before: { a: sa, b: sb },
+        after: { a: sb, b: sa },
+        reason: report.lines.join(' ') || undefined,
+      });
       break;
     }
     case 'match.schedule': {

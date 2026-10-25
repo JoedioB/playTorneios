@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { checkEligibility, normalizeSearch } from '@playtorneios/domain';
+import { checkEligibility, normalizeSearch, pairHasStartedMatches } from '@playtorneios/domain';
 import { useRuntime } from '../data/runtime.tsx';
 import { REG_STATUS_LABEL, pairName, uuid } from '../lib/format.ts';
 import { useRoute } from '../lib/router.ts';
@@ -41,6 +41,7 @@ export function DuplasScreen() {
   const [catId, setCatId] = useState('');
   const [err, setErr] = useState('');
   const [anon, setAnon] = useState<string | null>(null);
+  const [edit, setEdit] = useState<string | null>(null);
   const athletes = Object.values(state.athletes).filter((x) => !x.anonymizedAt).sort((x, y) => x.fullName.localeCompare(y.fullName));
   const birthNeeded = Object.values(state.categories).some((c) => c.ageRange && (c.ageRange.min !== undefined || c.ageRange.max !== undefined));
   const pairs = useMemo(() => {
@@ -69,7 +70,7 @@ export function DuplasScreen() {
         <div className="scroll-x" role="region" aria-label="Lista de duplas" tabIndex={0} style={{ marginTop: '1rem' }}>
           <table>
             <caption className="sr-only">Duplas cadastradas</caption>
-            <thead><tr><th scope="col">Dupla</th><th scope="col">Inscrições</th><th scope="col">Dados pessoais</th></tr></thead>
+            <thead><tr><th scope="col">Dupla</th><th scope="col">Inscrições</th><th scope="col">Dados pessoais</th><th scope="col">Editar</th></tr></thead>
             <tbody>
               {pairs.map((p) => {
                 const regs = Object.values(state.registrations).filter((r) => r.pairId === p.id);
@@ -85,6 +86,7 @@ export function DuplasScreen() {
                         </div>
                       ))}
                     </td>
+                    <td><Button size="sm" icon="edit" label={`Editar ${pairName(state, p.id)}`} onClick={() => setEdit(p.id)}>Editar</Button></td>
                   </tr>
                 );
               })}
@@ -101,6 +103,7 @@ export function DuplasScreen() {
           <Field label="Inscrever já em uma categoria (opcional)">{(p) => <select {...p} value={catId} onChange={(e) => setCatId(e.target.value)}><option value="">Não inscrever agora</option>{Object.values(state.categories).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
         </form>
       </Dialog>
+      {edit && <EditPairDialog pairId={edit} onClose={() => setEdit(null)} birthNeeded={birthNeeded} />}
       <Dialog open={!!anon} title="Anonimizar atleta" onClose={() => setAnon(null)} initialFocus="[data-safe]"
         footer={<><button className="btn" data-safe type="button" onClick={() => setAnon(null)}>Manter dados</button><Button variant="danger" onClick={() => { void run({ type: 'athlete.anonymize', payload: { athleteId: anon! } }, 'Atleta anonimizado.'); setAnon(null); }}>Anonimizar definitivamente</Button></>}>
         <p>Nome, telefone, nascimento e cidade serão removidos. Os resultados continuam, associados a “Atleta anonimizado”. <strong>Não dá para desfazer.</strong></p>
@@ -166,5 +169,64 @@ export function InscricoesScreen() {
         </table>
       </div>
     </>
+  );
+}
+
+function EditPairDialog(props: { pairId: string; onClose: () => void; birthNeeded: boolean }) {
+  const { state, run } = useRuntime();
+  const pair = state.pairs[props.pairId];
+  const [display, setDisplay] = useState(pair?.displayName ?? '');
+  const mk = (id: string) => {
+    const at = state.athletes[id];
+    return { id, fullName: at?.fullName ?? '', phone: at?.phone ?? '', birthDate: at?.birthDate ?? '', gender: at?.gender ?? '' };
+  };
+  const [a, setA] = useState(() => mk(pair?.athleteAId ?? ''));
+  const [b, setB] = useState(() => mk(pair?.athleteBId ?? ''));
+  const [swapA, setSwapA] = useState('');
+  const [swapB, setSwapB] = useState('');
+  const [ok, setOk] = useState(false);
+  const [err, setErr] = useState('');
+  if (!pair) return null;
+  const started = pairHasStartedMatches(state, pair.id);
+  const swapping = !!swapA || !!swapB;
+  const others = Object.values(state.athletes).filter((x) => !x.anonymizedAt && x.id !== pair.athleteAId && x.id !== pair.athleteBId).sort((x, y) => x.fullName.localeCompare(y.fullName));
+
+  const save = async () => {
+    setErr('');
+    if (!a.fullName.trim() || !b.fullName.trim()) return setErr('Informe o nome dos dois atletas.');
+    if (swapping && started && !ok) return setErr('Confirme a troca de atleta: esta dupla já tem partidas iniciadas.');
+    for (const x of [a, b]) {
+      const patch = { id: x.id, fullName: x.fullName.trim(), phone: x.phone.trim() || undefined, birthDate: x.birthDate || undefined, gender: (x.gender || undefined) as 'male' | 'female' | undefined };
+      if (!(await run({ type: 'athlete.save', payload: { athlete: patch } }))) return;
+    }
+    const pairPatch = { id: pair.id, athleteAId: swapA || pair.athleteAId, athleteBId: swapB || pair.athleteBId, displayName: display.trim() || undefined };
+    if (await run({ type: 'pair.save', payload: { pair: pairPatch, ...(swapping && started ? { confirmed: true } : {}) } }, 'Dupla atualizada.')) props.onClose();
+  };
+  const Side = (p: { label: string; v: typeof a; set: (v: typeof a) => void; swap: string; setSwap: (s: string) => void }) => (
+    <fieldset className="card">
+      <legend><h3>{p.label}</h3></legend>
+      <div className="form-grid">
+        <Field label="Nome completo">{(f) => <input {...f} value={p.v.fullName} onChange={(e) => p.set({ ...p.v, fullName: e.target.value })} />}</Field>
+        <Field label="Telefone (opcional)">{(f) => <input {...f} inputMode="tel" value={p.v.phone} onChange={(e) => p.set({ ...p.v, phone: e.target.value })} />}</Field>
+        <Field label="Gênero (opcional)">{(f) => <select {...f} value={p.v.gender} onChange={(e) => p.set({ ...p.v, gender: e.target.value })}><option value="">Não informar</option><option value="male">Masculino</option><option value="female">Feminino</option></select>}</Field>
+        {props.birthNeeded && <Field label="Data de nascimento">{(f) => <input {...f} type="date" value={p.v.birthDate} onChange={(e) => p.set({ ...p.v, birthDate: e.target.value })} />}</Field>}
+        <Field label="Substituir por outro atleta (opcional)" hint="Troca quem joga nesta dupla; os dados acima continuam com o atleta atual.">
+          {(f) => <select {...f} value={p.swap} onChange={(e) => p.setSwap(e.target.value)}><option value="">Manter este atleta</option>{others.map((x) => <option key={x.id} value={x.id}>{x.fullName}</option>)}</select>}
+        </Field>
+      </div>
+    </fieldset>
+  );
+  return (
+    <Dialog open title="Editar dupla" onClose={props.onClose} footer={<><Button onClick={props.onClose}>Cancelar</Button><Button variant="primary" icon="check" onClick={() => void save()}>Salvar</Button></>}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+        {err && <p className="error" role="alert">{err}</p>}
+        {Side({ label: 'Atleta 1', v: a, set: setA, swap: swapA, setSwap: setSwapA })}
+        {Side({ label: 'Atleta 2', v: b, set: setB, swap: swapB, setSwap: setSwapB })}
+        <Field label="Nome de exibição da dupla (opcional)">{(f) => <input {...f} value={display} onChange={(e) => setDisplay(e.target.value)} />}</Field>
+        {swapping && started && (
+          <label className="row"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> Entendo que a dupla já jogou: os resultados registrados não mudam, e a troca fica na auditoria.</label>
+        )}
+      </form>
+    </Dialog>
   );
 }

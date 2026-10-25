@@ -70,6 +70,14 @@ const shots = process.argv[3];
   await page.screenshot({ path: shots + '/chaves.png', fullPage: true });
   log('chave gerada com semente 42 (3 partidas)');
 
+  // Trocar posições (sem resultados: aplica direto)
+  await page.getByRole('button', { name: 'Trocar posições' }).click();
+  await page.getByLabel('Primeira posição').selectOption({ index: 1 });
+  await page.getByLabel('Segunda posição').selectOption({ index: 2 });
+  await page.getByRole('dialog').getByRole('button', { name: 'Trocar', exact: true }).click();
+  await page.getByText('Posições trocadas.').waitFor();
+  log('posições trocadas na chave (com auditoria)');
+
   // Agenda
   await page.goto(base + '/index.html#/agenda');
   await page.getByRole('button', { name: 'Gerar proposta' }).click();
@@ -180,6 +188,22 @@ const shots = process.argv[3];
   assert.ok(w <= 376, 'rolagem horizontal em 375px: ' + w);
   await mp.screenshot({ path: shots + '/mobile.png' });
   log('mobile 375px sem rolagem horizontal');
+
+  // Editar dupla (antes de iniciar partidas, sem confirmação extra)
+  await page.goto(base + '/index.html#/duplas');
+  await page.getByRole('button', { name: 'Editar Atleta 1A / Atleta 1B' }).click();
+  await page.getByLabel('Telefone (opcional)').first().fill('84999990000');
+  await page.getByLabel('Nome de exibição da dupla (opcional)').fill('Os Leões');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await page.getByText('Os Leões').first().waitFor();
+  log('dupla editada (nome de exibição)');
+
+  // Segunda aba no mesmo navegador é barrada (evita dois motores no mesmo banco)
+  const second = await ctx.newPage();
+  await second.goto(base + '/index.html');
+  await second.getByRole('heading', { name: 'O playTorneios já está aberto em outra aba' }).waitFor();
+  await second.close();
+  log('segunda aba é barrada');
 
   // Bloqueio por PIN
   await page.goto(base + '/index.html#/sistema');

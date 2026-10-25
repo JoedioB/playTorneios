@@ -19,6 +19,13 @@ export async function buildReportPdf(state: TournamentState): Promise<Uint8Array
     y -= size + (o.gap ?? 4);
   };
   const t = state.tournament;
+  if (t?.theme.logoDataUrl?.startsWith('data:image/png')) {
+    try {
+      const img = await doc.embedPng(t.theme.logoDataUrl);
+      const sc = Math.min(60 / img.height, 160 / img.width, 1);
+      page.drawImage(img, { x: W - M - img.width * sc, y: H - M - img.height * sc + 8, width: img.width * sc, height: img.height * sc });
+    } catch { /* logotipo inválido: segue sem ele */ }
+  }
   line(t?.name ?? 'Torneio', { size: 18, b: true, gap: 6 });
   line(`${t?.organizationName ?? ''} - ${t?.city ?? ''} - ${t?.venue ?? ''}`, { size: 10, gap: 4 });
   const generated = fmtDateTime(new Date().toISOString());
