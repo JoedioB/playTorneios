@@ -1,0 +1,81 @@
+name: playtorneios
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-playtorneios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:-playtorneios}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "src/migrate.ts"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-playtorneios}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-playtorneios}
+      COOKIE_SECRET: ${COOKIE_SECRET:?defina COOKIE_SECRET no arquivo .env}
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        REVISION: ${GIT_REVISION:-dev}
+        CREATED: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://${POSTGRES_USER:-playtorneios}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-playtorneios}
+      COOKIE_SECRET: ${COOKIE_SECRET:?defina COOKIE_SECRET no arquivo .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-8}
+      SESSION_ABSOLUTE_DAYS: ${SESSION_ABSOLUTE_DAYS:-7}
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        REVISION: ${GIT_REVISION:-dev}
+        CREATED: ${BUILD_DATE:-unknown}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+networks:
+  internal: {}
+
+volumes:
+  pgdata: {}

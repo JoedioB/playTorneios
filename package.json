@@ -1,0 +1,33 @@
+{
+  "name": "playtorneios",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\" \"packages/*/test/**/*.test.ts\" \"apps/*/test/**/*.test.ts\"",
+    "test:domain": "node --test \"packages/domain/test/**/*.test.ts\"",
+    "test:sync": "node --test \"packages/sync/test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "build": "pnpm -r --if-present build",
+    "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "up": "docker compose up --build",
+    "test:web": "node apps/web/test/build-smoke.mjs .smoke && node apps/web/test/smoke.cjs",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "playwright": "^1.50.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-boundaries": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}
