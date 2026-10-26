@@ -158,7 +158,7 @@ function ToastItem(props: { t: ReturnType<typeof useRuntime>['toasts'][number]; 
       <span>{props.t.text}</span>
       <span className="row">
         {props.t.undo && <Button size="sm" icon="undo" onClick={() => { void props.t.undo?.(); props.onDone(); }}>Desfazer</Button>}
-        <Button size="sm" label="Dispensar aviso" onClick={props.onDone}>OK</Button>
+        <Button size="sm" onClick={props.onDone}>OK<span className="sr-only"> (dispensar aviso)</span></Button>
       </span>
     </div>
   );

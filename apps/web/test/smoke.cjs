@@ -223,7 +223,7 @@ fs.mkdirSync(shots, { recursive: true });
     for (const contrast of ['dark', 'light']) {
       for (const r of routes) {
         await page.goto(`${base}/index.html#/${r}`);
-        await page.evaluate((c) => { document.documentElement.dataset.contrast = c; }, contrast);
+        await page.evaluate((c) => { const r = document.documentElement; r.dataset.contrast = c; if (c === 'light') { r.style.removeProperty('--amber'); r.style.removeProperty('--on-amber'); } }, contrast);
         await page.waitForTimeout(150);
         const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
         for (const v of res.violations) report.push({ tema: contrast, rota: '#/' + r, regra: v.id, impacto: v.impact, ajuda: v.help, alvos: v.nodes.slice(0, 3).map((n) => n.target.join(' ')) });

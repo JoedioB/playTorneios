@@ -48,8 +48,9 @@ export function SyncChip() {
     }
   })();
   return (
-    <a href="#/sync" style={{ textDecoration: 'none' }} aria-label={`Sincronização: ${describeSync(sync)} Abrir central de sincronização.`}>
+    <a href="#/sync" style={{ textDecoration: 'none' }}>
       {chip}
+      <span className="sr-only">. {describeSync(sync)} Abrir central de sincronização.</span>
     </a>
   );
 }
