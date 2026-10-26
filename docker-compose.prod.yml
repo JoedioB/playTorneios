@@ -1,0 +1,15 @@
+# Produção/staging: usa imagens publicadas (defina IMAGE_API e IMAGE_WEB) e não constrói nada localmente.
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  migrate:
+    image: ${IMAGE_API:?defina IMAGE_API}
+    build: !reset null
+  api:
+    image: ${IMAGE_API:?defina IMAGE_API}
+    build: !reset null
+    environment:
+      COOKIE_SECURE: "true"
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+  web:
+    image: ${IMAGE_WEB:?defina IMAGE_WEB}
+    build: !reset null

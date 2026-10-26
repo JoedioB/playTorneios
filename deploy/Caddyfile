@@ -1,0 +1,14 @@
+# Proxy HTTPS. O Caddy obtém e renova o certificado (Let's Encrypt) sozinho quando DOMAIN é um domínio público
+# apontado para este servidor, com as portas 80 e 443 abertas. Com DOMAIN=localhost usa um certificado local
+# (o navegador avisa até você confiar na CA do Caddy).
+{
+	email {$ACME_EMAIL:}
+}
+
+{$DOMAIN:localhost} {
+	encode zstd gzip
+	# O Caddy define X-Forwarded-For/Proto com o IP e o protocolo reais do visitante (o web confia nisso na porta 8081).
+	reverse_proxy web:8081 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
