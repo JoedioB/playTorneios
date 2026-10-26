@@ -101,6 +101,7 @@ const resultPayload = z
     confirmToken: z.string().max(64).optional(),
     expectedA: id.optional(),
     expectedB: id.optional(),
+    by: text(60).optional(),
   })
   .strict();
 

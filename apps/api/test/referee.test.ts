@@ -37,7 +37,7 @@ function build(): { store: MemoryServerStore; q1Match: string; q2Match: string; 
   return { store, q1Match: first.id, q2Match: firsts[1]!.id, pairs: ['', ''] };
 }
 
-const link: RefereeLink = { id: 'lk1', organizationId: 'org1', tournamentId: 't1', courtId: 'q1', label: 'Quadra 1', expiresAt: '2026-11-08T23:59:59.000Z' };
+const link: RefereeLink = { id: 'lk1', organizationId: 'org1', tournamentId: 't1', courtId: 'q1', label: 'João', expiresAt: '2026-11-08T23:59:59.000Z' };
 const NOW = '2026-11-07T09:00:05.000Z';
 const cmd = (opId: string, type: RefereeCommand['type'], payload: unknown): RefereeCommand => ({ opId, type, payload });
 
@@ -69,6 +69,7 @@ test('fluxo completo: abrir, marcar, finalizar; o aparelho fica registrado como 
   const s = store.states.get('t1')!;
   assert.equal(s.matches[q1Match]!.lifecycle, 'finished');
   assert.equal(s.results[q1Match]![0]!.deviceId, refereeDeviceId('lk1'));
+  assert.equal(s.results[q1Match]![0]!.recordedBy, link.label, 'o nome do juiz fica gravado na revisão');
   assert.equal(s.results[q1Match]![0]!.winnerPairId, a);
   // reenvio do mesmo comando não duplica
   const [again] = await refereePush(store, link, [rec], NOW);

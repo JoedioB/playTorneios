@@ -51,6 +51,8 @@ export interface ResultPayload {
   /** Duplas que o organizador via ao lançar. Se a chave mudou nesse meio tempo (outro aparelho), o resultado é recusado. */
   expectedA?: Id;
   expectedB?: Id;
+  /** Quem lançou, quando não é o organizador (nome do juiz do link; definido pelo servidor). */
+  by?: string;
 }
 
 export type CommandType = Command['type'];

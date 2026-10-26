@@ -96,7 +96,8 @@ export async function refereePush(store: ServerStore, link: RefereeLink, command
       entityType: target.entityType,
       entityId: target.entityId,
       tournamentId: link.tournamentId,
-      payload: c.payload,
+      // O nome do juiz vem do link (nunca do cliente) e fica gravado na revisão do resultado.
+      payload: c.type === 'result.record' && c.payload && typeof c.payload === 'object' ? { ...(c.payload as object), by: link.label } : c.payload,
       clientCreatedAt: serverNow,
       schemaVersion: SCHEMA_VERSION,
     };

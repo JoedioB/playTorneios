@@ -191,7 +191,7 @@ function JuizApp() {
     <main id="conteudo" className="scoreboard">
       <header>
         <h1 className="sb-title">{view.court.name}</h1>
-        <p className="muted small">{view.tournamentName}</p>
+        <p className="muted small">{view.tournamentName}{(view as RefereeView & { link?: { label?: string } }).link?.label ? ` · Juiz: ${(view as RefereeView & { link?: { label?: string } }).link?.label}` : ''}</p>
       </header>
       {banner}
       {message && <p className="banner" role="alert">{message}</p>}

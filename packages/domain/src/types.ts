@@ -206,6 +206,8 @@ export interface ResultRevision {
   invalidatedBy?: 'bracket_change' | 'correction';
   recordedAt: IsoDateTime;
   deviceId: string;
+  /** Nome de quem lançou, quando foi um juiz por link. */
+  recordedBy?: string;
 }
 
 export interface TieResolution {

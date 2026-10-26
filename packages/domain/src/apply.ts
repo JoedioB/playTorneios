@@ -252,6 +252,7 @@ function buildRevision(s: TournamentState, p: ResultPayload, ctx: ApplyContext):
     reason: reason || undefined,
     recordedAt: ctx.now,
     deviceId: ctx.deviceId,
+    recordedBy: p.by?.trim() || undefined,
   };
   return { revision, correction };
 }

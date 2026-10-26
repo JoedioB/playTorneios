@@ -20,6 +20,7 @@ export function JuizesScreen() {
   const [links, setLinks] = useState<LinkRow[] | null>(null);
   const [fresh, setFresh] = useState<{ url: string; court: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [names, setNames] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -32,8 +33,9 @@ export function JuizesScreen() {
   const create = async (courtId: string, courtName: string) => {
     setBusy(courtId);
     try {
-      const r = await api.post<{ token: string }>(`/api/tournaments/${encodeURIComponent(tid)}/referee-links`, { courtId, label: courtName });
-      setFresh({ url: `${location.origin}/juiz.html#${r.token}`, court: courtName });
+      const r = await api.post<{ token: string }>(`/api/tournaments/${encodeURIComponent(tid)}/referee-links`, { courtId, label: (names[courtId] ?? '').trim() || courtName });
+      setFresh({ url: `${location.origin}/juiz.html#${r.token}`, court: (names[courtId] ?? '').trim() ? `${courtName} — ${(names[courtId] ?? '').trim()}` : courtName });
+      setNames((n) => ({ ...n, [courtId]: '' }));
       void load();
     } catch (e) {
       toast({ text: e instanceof HttpError && e.status === 400 ? 'Sincronize o torneio antes: o servidor ainda não conhece esta quadra.' : 'Não foi possível gerar o link. Verifique a conexão.', kind: 'err' });
@@ -53,7 +55,7 @@ export function JuizesScreen() {
 
   return (
     <>
-      <PageHead title="Juízes" sub="Um link por quadra. Quem abre o link lança os pontos daquela quadra, sem criar conta." />
+      <PageHead title="Juízes" sub="Um link por juiz (gere vários na mesma quadra se houver revezamento). Quem abre o link lança os pontos daquela quadra, sem criar conta." />
       {!session && <p className="banner" role="status">Entre na sua conta para gerar links. Eles dependem do servidor.</p>}
       {courts.length === 0 ? <Empty title="Nenhuma quadra cadastrada">Cadastre as quadras para gerar um link por quadra.</Empty> : (
         <ul className="stack" style={{ listStyle: 'none', padding: 0 }}>
@@ -62,15 +64,18 @@ export function JuizesScreen() {
             return (
               <li className="card stack" key={c.id}>
                 <div className="row">
-                  <strong className="grow">{c.name}</strong>
-                  <Button size="sm" variant="primary" icon="plus" disabled={!session || busy === c.id} label={`Gerar link do juiz da ${c.name}`} onClick={() => void create(c.id, c.name)}>Gerar link</Button>
+                  <strong>{c.name}</strong>
+                  <label className="grow">Nome do juiz{' '}
+                    <input value={names[c.id] ?? ''} maxLength={60} placeholder="Ex.: João" onChange={(e) => setNames((n) => ({ ...n, [c.id]: e.target.value }))} />
+                  </label>
+                  <Button size="sm" variant="primary" icon="plus" disabled={!session || busy === c.id} label={`Gerar link para ${(names[c.id] ?? '').trim() || 'um juiz'} na ${c.name}`} onClick={() => void create(c.id, c.name)}>Gerar link</Button>
                 </div>
                 {mine.length === 0 ? <p className="muted small">Nenhum link ativo.</p> : (
                   <ul style={{ listStyle: 'none', padding: 0 }} className="stack">
                     {mine.map((l) => (
                       <li className="row" key={l.id}>
-                        <span className="grow small">Criado {fmtDateTime(l.createdAt)} · vale até {fmtDateTime(l.expiresAt)} · {minutesAgo(l.lastSeenAt)}</span>
-                        <Button size="sm" variant="danger" icon="x" label={`Revogar link da ${c.name} criado ${fmtDateTime(l.createdAt)}`} onClick={() => void revoke(l)}>Revogar</Button>
+                        <span className="grow small"><strong>{l.label}</strong> · criado {fmtDateTime(l.createdAt)} · vale até {fmtDateTime(l.expiresAt)} · {minutesAgo(l.lastSeenAt)}</span>
+                        <Button size="sm" variant="danger" icon="x" label={`Revogar link de ${l.label} na ${c.name}`} onClick={() => void revoke(l)}>Revogar</Button>
                       </li>
                     ))}
                   </ul>
