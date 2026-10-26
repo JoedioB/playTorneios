@@ -1,4 +1,4 @@
-/* global process, console */
+/* global process, console, URL */
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

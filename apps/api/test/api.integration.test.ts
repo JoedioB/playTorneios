@@ -283,6 +283,21 @@ if (!url) {
       assert.equal((await runRetention(pool, { ...config, RETENTION_MONTHS: 0 }, later)).athletes, 0);
     });
 
+    test('slug da página pública: vários torneios com o mesmo nome e ids parecidos nunca colidem nem derrubam o envio', async () => {
+      const a = await newAccount();
+      const slugs = new Set<string>();
+      for (let i = 0; i < 4; i++) {
+        // Ids que começam igual (o sufixo do slug sai do início do id): o caso que derrubou o CI com 500.
+        const plan = byId(plansFor(a.organizationId), 'seed-encerrado');
+        await pushAll(a.cookie, plan.operations);
+        const slug = (await pool.query('select slug from tournament_slugs where tournament_id = $1', [plan.tournamentId])).rows[0].slug as string;
+        assert.ok(!slugs.has(slug), `slug repetido: ${slug}`);
+        slugs.add(slug);
+        assert.equal((await call(`/api/public/${slug}`)).statusCode, 200);
+      }
+      assert.equal(slugs.size, 4);
+    });
+
     test('LGPD: excluir o torneio apaga estado, histórico, slug e página pública', async () => {
       const a = await newAccount();
       const plan = byId(plansFor(a.organizationId), 'seed-encerrado');
