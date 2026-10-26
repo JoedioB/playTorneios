@@ -79,8 +79,9 @@ jobs:
         run: |
           docker run --rm --add-host api:127.0.0.1 playtorneios-web:ci nginx -t
       - name: Varredura de vulnerabilidades (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
-        with: { image-ref: playtorneios-api:ci, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
-      - name: Varredura de vulnerabilidades (Trivy, web)
-        uses: aquasecurity/trivy-action@0.28.0
-        with: { image-ref: playtorneios-web:ci, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
+        # Imagem oficial do Trivy em vez da action (a tag fixada da action deixou de existir).
+        run: |
+          for img in playtorneios-api:ci playtorneios-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
+              image --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed "$img"
+          done
