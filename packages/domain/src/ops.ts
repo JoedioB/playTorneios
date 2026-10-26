@@ -34,7 +34,7 @@ export type Command =
   | { type: 'match.schedule'; payload: { matchId: Id; courtId: Id | null; scheduledAt: string | null } }
   | { type: 'schedule.apply'; payload: { assignments: Assignment[] } }
   | { type: 'match.start'; payload: { matchId: Id } }
-  | { type: 'match.live_score'; payload: { matchId: Id; a: number; b: number } }
+  | { type: 'match.live_score'; payload: { matchId: Id; a: number; b: number; sets?: SetScore[] } }
   | { type: 'result.record'; payload: ResultPayload }
   | { type: 'tie.resolve'; payload: { tie: Omit<TieResolution, 'resolvedAt'> } };
 

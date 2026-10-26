@@ -100,6 +100,13 @@ No painel, o hostname público do túnel aponta para `HTTP` `web:8082`. Essa por
 então o limite de tentativas de login por IP enxerga cada visitante. Passo a passo completo: `docs/TUTORIAL_MAQUINA_LOCAL.md`.
 Não use junto com `docker-compose.tls.yml`.
 
+## Operação na quadra
+
+- **Placar na quadra:** `#/placar/<partida>` (botão "Abrir placar" na Central). Botões grandes, desfazer, tela acesa.
+- **Juízes por quadra:** em **Juízes (placar)** gere um link/QR por quadra. O juiz abre `/juiz.html#<token>` no celular, sem conta, e só vê e lança a quadra dele. O link vale até o fim do torneio (máx. 7 dias) e pode ser revogado. Exige internet (há uma fila curta para quedas breves de sinal). Detalhes em `docs/SPEC_JUIZ.md`.
+- **Telão:** `#/telao`, para TV ou projetor: o que está em jogo em cada quadra e os próximos chamados.
+- **Súmulas em papel:** `#/imprimir`, folhas de reserva por quadra.
+
 ## Dados fictícios para testes (seed)
 
 Com a stack no ar (`docker compose up --build`), popule o banco com torneios de mentira:

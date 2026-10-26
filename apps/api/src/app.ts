@@ -1,6 +1,6 @@
 import { buildPublicSnapshot, emptyState, registrationsCsv } from '@playtorneios/domain';
 import type { TournamentState } from '@playtorneios/domain';
-import { discardSchema, formatZodError, loginSchema, operationSchema, resolveConflictSchema, signupSchema } from '@playtorneios/contracts';
+import { discardSchema, formatZodError, loginSchema, operationSchema, refereeLinkCreateSchema, refereePushSchema, resolveConflictSchema, signupSchema } from '@playtorneios/contracts';
 import { discardRejected, pullChanges, pushOperations, resolveConflictServer } from '@playtorneios/sync';
 import type { Operation } from '@playtorneios/sync';
 import cookie from '@fastify/cookie';
@@ -12,6 +12,9 @@ import { SESSION_COOKIE, authenticate, ipBlockedMinutes, login, logout, recordLo
 import type { AuthedUser } from './auth.ts';
 import type { Config } from './config.ts';
 import { PgServerStore } from './pg-store.ts';
+import { authenticateReferee, createRefereeLink, listRefereeLinks, revokeRefereeLink } from './referee.ts';
+import { refereeCourtView, refereePush } from './referee-core.ts';
+import type { RefereeLink } from './referee-core.ts';
 import { createHash } from 'node:crypto';
 
 export interface AppDeps {
@@ -21,6 +24,7 @@ export interface AppDeps {
 }
 
 const MUTATION_HEADER = 'x-playtorneios';
+const sha256Short = (v: string): string => createHash('sha256').update(v).digest('hex').slice(0, 32);
 type PushResultLike = { opId: string; status: 'rejected' | 'blocked'; error: { code: string; message: string } };
 
 export async function buildApp(deps: AppDeps) {
@@ -46,7 +50,13 @@ export async function buildApp(deps: AppDeps) {
     const url: string = req.url.split('?')[0];
     if (url === '/api/health' || url.startsWith('/api/public/')) return;
     const publicAuth = url === '/api/auth/login' || url === '/api/auth/signup';
-    if (!publicAuth) {
+    if (url.startsWith('/api/referee/')) {
+      // Juiz: credencial por link (Bearer), limitada a uma quadra. Nunca aceita a sessão do organizador aqui.
+      const bearer = /^Bearer ([A-Za-z0-9_-]+)$/.exec(String(req.headers.authorization ?? ''))?.[1];
+      const link = await authenticateReferee(pool, bearer);
+      if (!link) return reply.code(401).send({ error: { code: 'LINK_INVALID', message: 'Link encerrado ou inválido. Peça um novo ao organizador.' } });
+      req.referee = link;
+    } else if (!publicAuth) {
       const user = await authenticate(pool, config, req.cookies?.[SESSION_COOKIE]);
       if (!user) return reply.code(401).send({ error: { code: 'UNAUTHENTICATED', message: 'Sua sessão expirou. Entre novamente.' } });
       req.user = user;
@@ -225,6 +235,47 @@ export async function buildApp(deps: AppDeps) {
     return { ok: true };
   });
 
+  // ---------- Juiz (link por quadra; SPEC_JUIZ.md) ----------
+  // Limite por link (e não por IP): num ginásio todos os juízes e o público dividem o mesmo Wi-Fi.
+  const refereeLimit = { rateLimit: { max: 300, timeWindow: '1 minute', keyGenerator: (req: any) => `ref:${sha256Short(String(req.headers.authorization ?? req.ip))}` } };
+  app.get('/api/referee/court', { config: refereeLimit }, async (req: any, reply: any) => {
+    const link = req.referee as RefereeLink;
+    const view = await refereeCourtView(new PgServerStore(pool, link.organizationId), link);
+    if (!view) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Quadra não encontrada.' } });
+    return { ...view, link: { label: link.label, expiresAt: link.expiresAt }, serverTime: now() };
+  });
+
+  app.post('/api/referee/push', { config: refereeLimit }, async (req: any, reply: any) => {
+    const link = req.referee as RefereeLink;
+    const p = refereePushSchema.safeParse(req.body);
+    if (!p.success) return reply.code(400).send({ error: { code: 'VALIDATION', message: formatZodError(p.error) } });
+    const results = await refereePush(new PgServerStore(pool, link.organizationId), link, p.data.commands, now());
+    if (results.some((r) => r.status === 'applied')) await refreshSnapshotIfAuto(pool, link.organizationId, link.tournamentId, now());
+    return { results };
+  });
+
+  app.get('/api/tournaments/:id/referee-links', async (req: any) => {
+    const u = req.user as AuthedUser;
+    return { links: await listRefereeLinks(pool, u.organizationId, req.params.id) };
+  });
+
+  app.post('/api/tournaments/:id/referee-links', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req: any, reply: any) => {
+    const u = req.user as AuthedUser;
+    const p = refereeLinkCreateSchema.safeParse(req.body);
+    if (!p.success) return reply.code(400).send({ error: { code: 'VALIDATION', message: formatZodError(p.error) } });
+    const r = await createRefereeLink(pool, u.organizationId, req.params.id, p.data, now());
+    if (r === 'not_found') return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Torneio não encontrado.' } });
+    if (r === 'court_not_found') return reply.code(400).send({ error: { code: 'COURT_NOT_FOUND', message: 'Quadra não encontrada neste torneio.' } });
+    return reply.code(201).send(r);
+  });
+
+  app.delete('/api/tournaments/:id/referee-links/:linkId', async (req: any, reply: any) => {
+    const u = req.user as AuthedUser;
+    const ok = await revokeRefereeLink(pool, u.organizationId, req.params.id, req.params.linkId);
+    if (!ok) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Link não encontrado.' } });
+    return { ok: true };
+  });
+
   // ---------- Publicação e exportação ----------
   app.post('/api/tournaments/:id/publish', async (req: any, reply: any) => {
     const u = req.user as AuthedUser;
@@ -253,6 +304,7 @@ export async function buildApp(deps: AppDeps) {
         await client.query('rollback');
         return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Torneio não encontrado.' } });
       }
+      await client.query('delete from referee_links where tournament_id = $1 and organization_id = $2', [tid, u.organizationId]);
       await client.query('delete from tournament_slugs where tournament_id = $1', [tid]);
       await client.query('delete from sync_conflicts where tournament_id = $1', [tid]);
       await client.query('delete from applied_operations where tournament_id = $1 or op_id in (select op_id from sync_halts where starts_with(key, $2))', [tid, `${tid}/`]);

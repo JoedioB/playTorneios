@@ -9,6 +9,10 @@ import { CentralScreen } from './screens/central.tsx';
 import { ChavesScreen } from './screens/chaves.tsx';
 import { DuplasScreen, InscricoesScreen } from './screens/duplas.tsx';
 import { EncerramentoScreen } from './screens/encerramento.tsx';
+import { PlacarScreen } from './screens/placar.tsx';
+import { JuizesScreen } from './screens/juizes.tsx';
+import { ImprimirScreen } from './screens/imprimir.tsx';
+import { TelaoScreen } from './screens/telao.tsx';
 import { LoginScreen } from './screens/login.tsx';
 import { PublicoScreen } from './screens/publico.tsx';
 import { QuadrasScreen } from './screens/quadras.tsx';
@@ -34,6 +38,8 @@ function Screens() {
     case 'duplas': return <DuplasScreen />;
     case 'categorias': return <CategoriasScreen />;
     case 'quadras': return <QuadrasScreen />;
+    case 'juizes': return <JuizesScreen />;
+    case 'imprimir': return <ImprimirScreen />;
     case 'torneio': return <TorneioScreen />;
     case 'publico': return <PublicoScreen />;
     case 'relatorios': return <RelatoriosScreen />;
@@ -98,6 +104,8 @@ function AppInner() {
     if (auth === 'anon') return <><LoginScreen onDone={() => void check()} /><ToastRegion /></>;
     return <><Onboarding /><ToastRegion /></>;
   }
+  if (route.path[0] === 'telao') return <TelaoScreen />;
+  if (route.path[0] === 'placar' && route.path[1]) return <PlacarScreen matchId={route.path[1]} />;
   return (
     <Shell>
       {auth === 'anon' && !session && (

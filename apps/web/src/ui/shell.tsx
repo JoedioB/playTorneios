@@ -16,12 +16,15 @@ const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon
     { to: '/agenda', label: 'Agenda', icon: 'calendar' },
     { to: '/chaves', label: 'Chaves', icon: 'bracket' },
     { to: '/resultados', label: 'Resultados e classificação', icon: 'trophy' },
+    { to: '/telao', label: 'Telão (TV)', icon: 'globe' },
+    { to: '/imprimir', label: 'Imprimir súmulas', icon: 'list' },
   ] },
   { group: 'Preparação', items: [
     { to: '/inscricoes', label: 'Inscrições e check-in', icon: 'list' },
     { to: '/duplas', label: 'Atletas e duplas', icon: 'users' },
     { to: '/categorias', label: 'Categorias e regras', icon: 'settings' },
     { to: '/quadras', label: 'Quadras', icon: 'court' },
+    { to: '/juizes', label: 'Juízes (placar)', icon: 'flag' },
     { to: '/torneio', label: 'Dados do torneio', icon: 'flag' },
   ] },
   { group: 'Publicação', items: [

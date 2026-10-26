@@ -37,6 +37,7 @@ export function LiveCard(props: { matchId: string; onFinish: (id: string) => voi
       <div className="row">
         <Button size="sm" icon="undo" onClick={() => void set(live.a > 0 ? live.a - 1 : 0, live.b)}>Desfazer ponto de A</Button>
         <Button size="sm" icon="undo" onClick={() => void set(live.a, live.b > 0 ? live.b - 1 : 0)}>Desfazer ponto de B</Button>
+        <Button icon="play" onClick={() => go(`/placar/${m.id}`)}>Abrir placar</Button>
         <Button variant="primary" icon="check" onClick={() => props.onFinish(m.id)}>Finalizar partida</Button>
       </div>
     </article>
