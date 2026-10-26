@@ -61,13 +61,16 @@ export interface DerivedTheme {
 
 export const THEME_DARK_BG = '#0A0E14';
 export const THEME_LIGHT_BG = '#FFFFFF';
+/** Superfícies mais escuras onde o destaque também aparece (cartões e itens ativos): o contraste é garantido contra elas. */
+export const THEME_DARK_SURFACE = '#1A2330';
+export const THEME_LIGHT_SURFACE = '#E6EAEE';
 
 /** A identidade do organizador nunca pode quebrar a legibilidade: ajustamos em vez de recusar (SPECS §10.5). */
 export function deriveTheme(primary: string, accent: string): DerivedTheme {
   const p = isHexColor(primary) ? primary : '#FFB020';
   const a = isHexColor(accent) ? accent : '#FFB020';
-  const accentOnDark = ensureContrast(a, THEME_DARK_BG, 4.5);
-  const accentOnLight = ensureContrast(a, THEME_LIGHT_BG, 4.5);
+  const accentOnDark = ensureContrast(ensureContrast(a, THEME_DARK_BG, 4.5), THEME_DARK_SURFACE, 4.5);
+  const accentOnLight = ensureContrast(ensureContrast(a, THEME_LIGHT_BG, 4.5), THEME_LIGHT_SURFACE, 4.5);
   return {
     primary: p,
     onPrimary: onColor(p),

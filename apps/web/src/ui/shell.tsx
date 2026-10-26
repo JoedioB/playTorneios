@@ -164,8 +164,8 @@ export function Shell(props: { children: ReactNode }) {
         <Button variant="primary" icon="play" onClick={() => go('/resultados?registrar=1')}>Registrar placar</Button>
         <TournamentSwitcher currentId={state.tournament?.id} />
         <SyncChip />
-        <Button size="sm" icon="sun" pressed={contrast === 'light'} label="Alto contraste claro (uso ao sol)" onClick={() => setContrast(contrast === 'light' ? 'dark' : 'light')}>
-          {contrast === 'light' ? 'Tema escuro' : 'Modo sol'}
+        <Button size="sm" icon="sun" pressed={contrast === 'light'} onClick={() => setContrast(contrast === 'light' ? 'dark' : 'light')}>
+          Modo sol
         </Button>
         {session && <span className="muted small">{session.email}</span>}
       </header>
