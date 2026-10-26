@@ -1,0 +1,25 @@
+# Acesso pela internet sem abrir portas no roteador: Cloudflare Tunnel (cloudflared).
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
+# No .env: TUNNEL_TOKEN=<token do túnel criado no painel da Cloudflare>
+# No painel, o "Public Hostname" do túnel aponta para:  HTTP  web:8082
+# Não combine com docker-compose.tls.yml (o túnel já entrega o HTTPS; o Caddy não é necessário).
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no arquivo .env}
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      web: { condition: service_healthy }
+    networks: [internal]
+
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+
+  web:
+    # Só o cloudflared fala com o web; a porta 8080 deixa de ser publicada no host.
+    ports: !reset []

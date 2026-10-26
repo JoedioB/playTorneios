@@ -71,9 +71,10 @@ jobs:
         with: { context: ., file: apps/web/Dockerfile, push: false, cache-from: type=gha, cache-to: "type=gha,mode=max", tags: "playtorneios-web:ci", load: true }
       - name: Valida os arquivos do Compose
         run: |
-          cp .env.example .env && sed -i 's/^# DOMAIN=.*/DOMAIN=ci.example.com/' .env
+          cp .env.example .env && sed -i 's/^# DOMAIN=.*/DOMAIN=ci.example.com/; s/^# TUNNEL_TOKEN=.*/TUNNEL_TOKEN=ci/' .env
           docker compose config -q
           docker compose -f docker-compose.yml -f docker-compose.tls.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.tunnel.yml config -q
           docker compose --profile seed config -q
       - name: Sintaxe do nginx (os dois listeners)
         run: |

@@ -87,6 +87,19 @@ O web ganha um segundo listener interno (8081, não publicado) que confia no `X-
 da API enxergar cada visitante. Teste local: `DOMAIN=localhost` e abra `https://localhost` (aceite o certificado local do Caddy).
 Confira depois: `curl -sI https://SEU_DOMINIO/api/health` e, no navegador, o cookie de sessão marcado como `Secure`.
 
+## Cloudflare Tunnel (servidor em casa, sem abrir portas)
+
+Alternativa ao Caddy para uma máquina local ou atrás de CGNAT. O `cloudflared` abre uma conexão de saída com a Cloudflare, que entrega o HTTPS:
+
+```bash
+# .env: TUNNEL_TOKEN=...   (token do túnel criado no painel da Cloudflare)
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build
+```
+
+No painel, o hostname público do túnel aponta para `HTTP` `web:8082`. Essa porta interna (não publicada) confia no `CF-Connecting-IP`,
+então o limite de tentativas de login por IP enxerga cada visitante. Passo a passo completo: `docs/TUTORIAL_MAQUINA_LOCAL.md`.
+Não use junto com `docker-compose.tls.yml`.
+
 ## Dados fictícios para testes (seed)
 
 Com a stack no ar (`docker compose up --build`), popule o banco com torneios de mentira:
