@@ -81,7 +81,9 @@ jobs:
       - name: Varredura de vulnerabilidades (Trivy)
         # Imagem oficial do Trivy em vez da action (a tag fixada da action deixou de existir).
         run: |
+          status=0
           for img in playtorneios-api:ci playtorneios-web:ci; do
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
-              image --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed "$img"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/.trivyignore:/.trivyignore:ro" aquasec/trivy:latest \
+              image --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed --ignorefile /.trivyignore "$img" || status=1
           done
+          exit $status
