@@ -21,6 +21,8 @@ LABEL org.opencontainers.image.title="playtorneios-api" \
       org.opencontainers.image.revision=$REVISION \
       org.opencontainers.image.created=$CREATED
 ENV NODE_ENV=production
+# O runtime só executa `node`: remover npm/npx/corepack tira do contêiner dependências embutidas que não usamos (e seus CVEs).
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 WORKDIR /repo
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages

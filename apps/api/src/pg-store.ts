@@ -59,8 +59,16 @@ export class PgServerStore implements ServerStore {
           const mine = await c.query('select slug from tournament_slugs where tournament_id = $1', [tid]);
           const wanted = state.tournament.slug;
           if (mine.rows[0]?.slug !== wanted) {
-            const taken = await c.query('select tournament_id from tournament_slugs where slug = $1 and tournament_id <> $2', [wanted, tid]);
-            const slug = taken.rowCount ? `${wanted}-${tid.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase()}` : wanted;
+            // Candidatos em ordem fixa (estável entre salvamentos): o pedido, depois com o sufixo do id, depois com contador.
+            // O sufixo vem do início do id, que pode coincidir entre torneios; o contador garante que sempre haja um livre.
+            const suffix = tid.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase() || 't';
+            let slug = wanted;
+            for (let n = 0; ; n++) {
+              slug = n === 0 ? wanted : n === 1 ? `${wanted}-${suffix}` : `${wanted}-${suffix}-${n}`;
+              const taken = await c.query('select 1 from tournament_slugs where slug = $1 and tournament_id <> $2', [slug, tid]);
+              if (!taken.rowCount) break;
+              if (n > 200) throw new Error('SLUG_EXHAUSTED');
+            }
             await c.query(
               `insert into tournament_slugs(slug, tournament_id) values ($1,$2)
                on conflict (tournament_id) do update set slug = excluded.slug`,

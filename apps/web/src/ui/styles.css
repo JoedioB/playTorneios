@@ -9,7 +9,7 @@
   --f-num: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --r: 8px; --bar-h: 64px;
 }
-:root[data-contrast='light'] {
+:root[data-contrast='light'], [data-contrast='light'] {
   color-scheme: light;
   --bg: #ffffff; --surf: #f3f5f7; --surf2: #e6eaee; --hair: #c3cbd4; --line: #5a6572;
   --tx: #0a0e14; --tx2: #3d4854; --amber: #8a5300; --on-amber: #ffffff; --live: #b3261e; --on-live: #ffffff;

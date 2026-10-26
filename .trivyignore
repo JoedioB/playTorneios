@@ -1,0 +1,5 @@
+# Exceções revisadas da varredura de imagens. Cada uma precisa de justificativa e revisão.
+# zod 3.x: DoS por array sem limite. Todos os arrays dos contratos têm .max(...) e o corpo das
+# requisições é limitado a 1 MB (bodyLimit no Fastify); a correção só existe na linha 4.x (quebra de API).
+# Revisar ao migrar para zod 4.
+CVE-2023-54404

@@ -151,3 +151,5 @@ vite.config.ts.timestamp-*
 # Pacotes de entrega e artefatos de teste
 playtorneios.tar.gz
 .smoke/
+logs_github_actions/
+logs_*.zip
