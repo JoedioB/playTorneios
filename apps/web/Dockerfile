@@ -15,6 +15,10 @@ ARG CREATED=unknown
 LABEL org.opencontainers.image.title="playtorneios-web" \
       org.opencontainers.image.revision=$REVISION \
       org.opencontainers.image.created=$CREATED
+# A imagem base envelhece: atualiza os pacotes do Alpine (OpenSSL, zlib, musl, curl...) no momento do build.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY apps/web/locations.inc /etc/nginx/conf.d/locations.inc
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
