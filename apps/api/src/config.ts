@@ -6,6 +6,9 @@ const schema = z.object({
   HOST: z.string().default('0.0.0.0'),
   DATABASE_URL: z.string().min(1),
   COOKIE_SECRET: z.string().min(32, 'COOKIE_SECRET precisa ter pelo menos 32 caracteres'),
+  // Bloqueio por IP: depois de N senhas erradas na janela, o IP recebe 429 (mesmo com a senha certa).
+  LOGIN_IP_MAX_FAILURES: z.coerce.number().int().min(1).default(30),
+  LOGIN_IP_WINDOW_MIN: z.coerce.number().int().min(1).default(60),
   SESSION_IDLE_HOURS: z.coerce.number().default(8),
   SESSION_ABSOLUTE_DAYS: z.coerce.number().default(7),
   COOKIE_SECURE: z

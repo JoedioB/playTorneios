@@ -12,8 +12,9 @@ import { App } from './App.tsx';
 import { DexieStorage } from './data/dexie-storage.ts';
 import { HttpTransport } from './data/http-transport.ts';
 import { RuntimeProvider } from './data/runtime.tsx';
+import { activeDb } from './lib/tournaments.ts';
 
-const storage = new DexieStorage();
+const storage = new DexieStorage(activeDb());
 const transport = new HttpTransport();
 
 let initial: { email: string; organizationId: string } | null = null;

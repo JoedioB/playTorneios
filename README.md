@@ -39,6 +39,10 @@ pnpm lint
 pnpm test:web     # teste de fumaça no Chromium (precisa de Playwright: pnpm exec playwright install chromium)
 ```
 
+Testes de integração da API (Postgres real, `app.inject`): crie um banco **descartável** e rode
+`createdb pt_api && TEST_DATABASE_URL=postgres://USUARIO:SENHA@localhost:5432/pt_api pnpm --filter @playtorneios/api test`.
+Sem `TEST_DATABASE_URL` eles são pulados. O teste apaga o schema `public` desse banco e recusa nomes que não contenham `test` ou `pt_api`.
+
 ## Estrutura
 
 | Pasta | O que é |
@@ -54,6 +58,53 @@ As regras de dependência entre pastas são verificadas por `test/architecture.t
 ## Primeiro uso
 
 Rode `pnpm install` uma vez e **faça commit do `pnpm-lock.yaml`** (o CI e as imagens usam instalação congelada).
+
+## Vários torneios no mesmo aparelho
+
+O botão **Trocar torneio** (topo do app) abre outro torneio ou cria um novo. Cada torneio tem seu próprio banco local; os que vêm do
+servidor são baixados no primeiro acesso (precisa de internet). A fila de envio de cada torneio só segue enquanto ele está aberto:
+o app avisa se você trocar com alterações ainda pendentes.
+
+## HTTPS (TLS)
+
+Em produção o cookie de sessão é `Secure` e só funciona sob HTTPS. O overlay `docker-compose.tls.yml` coloca um Caddy na frente
+(certificado Let's Encrypt automático, renovação sozinha):
+
+```bash
+# .env: DOMAIN=torneios.exemplo.com.br  ACME_EMAIL=voce@exemplo.com.br  COOKIE_SECURE=true
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+```
+
+Requisitos: o DNS do domínio aponta para o servidor e as portas 80 e 443 estão abertas. A porta 8080 deixa de ser publicada.
+O web ganha um segundo listener interno (8081, não publicado) que confia no `X-Forwarded-For` do Caddy, para o limite de taxa
+da API enxergar cada visitante. Teste local: `DOMAIN=localhost` e abra `https://localhost` (aceite o certificado local do Caddy).
+Confira depois: `curl -sI https://SEU_DOMINIO/api/health` e, no navegador, o cookie de sessão marcado como `Secure`.
+
+## Dados fictícios para testes (seed)
+
+Com a stack no ar (`docker compose up --build`), popule o banco com torneios de mentira:
+
+```bash
+pnpm seed                                   # cria a conta de teste e os torneios (opções: pnpm seed --carga, --reset, --only=copa)
+docker compose --profile seed run --rm seed --reset          # apaga e recria os torneios seed-*
+docker compose --profile seed run --rm seed --carga          # inclui o torneio grande (104 duplas)
+docker compose --profile seed run --rm seed --only=encerrado # só um torneio
+```
+
+O seed usa a API de verdade (cadastro, login e `/api/sync/push`), então versões, slugs e páginas públicas ficam coerentes.
+Conta criada: `organizador@teste.playtorneios.dev` / `SenhaDeTeste#2026` (mude com `SEED_EMAIL` e `SEED_PASSWORD` no `.env`).
+Exige `ALLOW_SIGNUP=true` na primeira execução (ou uma conta já existente com o mesmo e-mail e senha).
+
+| Torneio (id) | O que testa |
+| --- | --- |
+| Copa Praia Grande (`seed-copa`) | Em andamento. Masculina: 12 duplas, grupos completos com W.O., desistência e correção com justificativa, mata-mata até as semifinais, final ao vivo. Feminina: grupo com **empate circular em aberto** (desempate manual). Mista: 8 vagas, lista de espera, inscrição pendente e cancelada, partida em andamento. Agenda em 3 quadras. Página pública publicada |
+| Open de Inverno (`seed-encerrado`) | Encerrado, pódio completo em duas categorias, página pública |
+| Torneio de Verão (`seed-rascunho`) | Rascunho sem duplas (fluxo de configuração) |
+| Circuito Estadual (`seed-carga`, só com `--carga`) | 104 duplas, 6 quadras, centenas de partidas (desempenho) |
+
+Todos os nomes são sorteados de listas comuns e os telefones usam DDD `00` (inexistente). **O app mostra um torneio por aparelho**
+(o mais recentemente atualizado, que é a Copa); para ver outro, rode o seed com `--only=<nome> --reset` e abra em janela anônima
+ou limpe os dados do site. Não rode o seed em produção: ele cria uma conta com senha conhecida.
 
 ## Primeira subida: roteiro de verificação
 

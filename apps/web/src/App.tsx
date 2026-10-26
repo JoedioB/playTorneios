@@ -19,6 +19,7 @@ import { LockGate } from './ui/lockgate.tsx';
 import { TabGuard } from './ui/tabguard.tsx';
 import { Shell } from './ui/shell.tsx';
 import { ToastRegion } from './ui/kit.tsx';
+import { WANT_NEW, clearWanted, rememberCurrent, wantedTournament } from './lib/tournaments.ts';
 
 const SESSION_KEY = 'pt:session';
 
@@ -68,9 +69,16 @@ function AppInner() {
       try { localStorage.setItem(SESSION_KEY, JSON.stringify(me.user)); } catch { /* sem armazenamento */ }
       setAuth('ok');
       if (!engine.state.tournament) {
-        const list = await api.get<{ tournaments: Array<{ id: string }> }>('/api/tournaments');
-        const first = list.tournaments[0];
-        if (first) await engine.pull(first.id);
+        const want = wantedTournament();
+        if (want === WANT_NEW) {
+          // Quem pediu "Criar novo torneio" fica na tela de criação, sem baixar nada.
+        } else if (want) {
+          await engine.pull(want);
+        } else {
+          const list = await api.get<{ tournaments: Array<{ id: string }> }>('/api/tournaments');
+          const first = list.tournaments[0];
+          if (first) await engine.pull(first.id);
+        }
       } else {
         void engine.sync();
       }
@@ -80,15 +88,14 @@ function AppInner() {
     }
   }, [engine, setSession]);
 
-  const signOut = useCallback(async () => {
-    try { await api.post('/api/auth/logout'); } catch { /* sem rede: a sessão expira sozinha */ }
-    try { localStorage.removeItem(SESSION_KEY); } catch { /* sem armazenamento */ }
-    setSession(null);
-    setAuth('anon');
-    location.hash = '#/sessao';
-  }, [setSession]);
-
   useEffect(() => { void check(); }, [check]);
+  // Lembra deste torneio para o seletor e encerra o pedido de abertura (já foi atendido).
+  useEffect(() => {
+    const t = state.tournament;
+    if (!t) return;
+    rememberCurrent(t.id, t.name);
+    clearWanted();
+  }, [state.tournament?.id, state.tournament?.name]);
   useEffect(() => { if (sync.network && auth === 'offline') void check(); }, [sync.network, auth, check]);
 
   if (auth === 'checking') return <p role="status" style={{ padding: '2rem' }}>Verificando sessão…</p>;

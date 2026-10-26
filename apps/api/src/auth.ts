@@ -22,6 +22,22 @@ export async function hashPassword(pw: string): Promise<string> {
 
 let dummy: Promise<string> | undefined;
 
+/** Quantos minutos faltam para o IP voltar a poder tentar; 0 se não está bloqueado. */
+export async function ipBlockedMinutes(pool: Pool, cfg: Config, ip: string): Promise<number> {
+  const r = await pool.query(
+    `select count(*)::int as n, min(at) as first from login_failures where ip = $1 and at > now() - ($2 || ' minutes')::interval`,
+    [ip, String(cfg.LOGIN_IP_WINDOW_MIN)],
+  );
+  const { n, first } = r.rows[0] as { n: number; first: Date | null };
+  if (n < cfg.LOGIN_IP_MAX_FAILURES || !first) return 0;
+  // A tentativa mais antiga da janela sai da contagem em (first + janela).
+  return Math.max(1, Math.ceil((new Date(first).getTime() + cfg.LOGIN_IP_WINDOW_MIN * 60000 - Date.now()) / 60000));
+}
+
+export async function recordLoginFailure(pool: Pool, ip: string): Promise<void> {
+  await pool.query('insert into login_failures(ip) values ($1)', [ip]);
+}
+
 export type LoginOutcome = { ok: true; token: string; user: { id: string; email: string; organizationId: string } } | { ok: false; reason: 'invalid' | 'locked'; retryAfterMin?: number };
 
 /** Mensagem única para "usuário inexistente" e "senha errada"; hash de mentira iguala o tempo de resposta. */

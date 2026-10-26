@@ -16,10 +16,13 @@
     "build": "pnpm -r --if-present build",
     "dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "up": "docker compose up --build",
+    "seed": "docker compose --profile seed run --rm seed",
+    "seed:local": "pnpm --filter @playtorneios/api exec node src/seed/run.ts",
     "test:web": "node apps/web/test/build-smoke.mjs .smoke && node apps/web/test/smoke.cjs",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@eslint/js": "^9.0.0",
     "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",

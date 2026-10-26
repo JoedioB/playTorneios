@@ -8,7 +8,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import type { Pool } from 'pg';
-import { SESSION_COOKIE, authenticate, login, logout, signup } from './auth.ts';
+import { SESSION_COOKIE, authenticate, ipBlockedMinutes, login, logout, recordLoginFailure, signup } from './auth.ts';
 import type { AuthedUser } from './auth.ts';
 import type { Config } from './config.ts';
 import { PgServerStore } from './pg-store.ts';
@@ -26,7 +26,12 @@ type PushResultLike = { opId: string; status: 'rejected' | 'blocked'; error: { c
 export async function buildApp(deps: AppDeps) {
   const { pool, config } = deps;
   const now = deps.now ?? (() => new Date().toISOString());
-  const app = Fastify({ logger: config.NODE_ENV !== 'test', bodyLimit: 1_000_000, trustProxy: 1 });
+  const app = Fastify({
+    logger: config.NODE_ENV !== 'test',
+    bodyLimit: 1_000_000,
+    // Confia só no primeiro salto (o nginx, que grava o IP real em X-Forwarded-For): o cliente não forja o IP.
+    trustProxy: (_addr: string, hop: number) => hop < 1,
+  });
 
   await app.register(helmet, {
     contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
@@ -74,8 +79,14 @@ export async function buildApp(deps: AppDeps) {
   app.post('/api/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req: any, reply: any) => {
     const p = loginSchema.safeParse(req.body);
     if (!p.success) return reply.code(400).send({ error: { code: 'VALIDATION', message: formatZodError(p.error) } });
+    // Limite por IP: vale também para e-mails que não existem (tentativa de adivinhar contas ou senhas em massa).
+    const wait = await ipBlockedMinutes(pool, config, req.ip);
+    if (wait > 0) {
+      return reply.code(429).header('retry-after', String(wait * 60)).send({ error: { code: 'TOO_MANY_ATTEMPTS', message: `Muitas tentativas de entrada deste endereço. Tente de novo em ${wait} minuto(s).` } });
+    }
     const r = await login(pool, config, p.data.email, p.data.password, req.headers['user-agent']);
     if (!r.ok) {
+      await recordLoginFailure(pool, req.ip);
       // Mesma resposta para senha errada e conta bloqueada: não revela quais e-mails existem.
       return reply.code(401).send({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha incorretos, ou conta bloqueada por alguns minutos após muitas tentativas.' } });
     }

@@ -12,8 +12,10 @@ const purgeSessions = () =>
   pool
     .query(`delete from sessions where expires_at < now() or last_seen_at < now() - ($1 || ' hours')::interval`, [String(config.SESSION_IDLE_HOURS ?? 8)])
     .catch((e) => console.error('purge de sessões falhou', e.message));
+const purgeLoginFailures = () => pool.query(`delete from login_failures where at < now() - interval '1 day'`).catch((e) => console.error('purge de tentativas falhou', e.message));
 void purgeSessions();
-const purgeTimer = setInterval(purgeSessions, 3_600_000);
+void purgeLoginFailures();
+const purgeTimer = setInterval(() => { void purgeSessions(); void purgeLoginFailures(); }, 3_600_000);
 purgeTimer.unref();
 
 const stop = async () => {

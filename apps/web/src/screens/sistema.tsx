@@ -6,6 +6,7 @@ import { useRuntime } from '../data/runtime.tsx';
 import { buildBackup, download, parseBackup } from '../lib/backup.ts';
 import type { BackupFile } from '../lib/backup.ts';
 import { buildReportPdf } from '../lib/pdf.ts';
+import { forget } from '../lib/tournaments.ts';
 import { clearPin, loadLock, setLockMinutes, setPin, validPin } from '../lib/lock.ts';
 import { Button, Dialog, PageHead } from '../ui/kit.tsx';
 
@@ -74,6 +75,7 @@ export function SistemaScreen() {
     location.reload();
   };
   const wipeLocal = async () => {
+    if (state.tournament) forget(state.tournament.id);
     await (storage as DexieStorage).replaceAll({ outbox: [], discarded: [] });
     location.href = '/';
   };

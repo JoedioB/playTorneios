@@ -66,7 +66,7 @@ textarea { min-height: 6rem; } input[type='checkbox'], input[type='radio'] { wid
 .check { display: flex; gap: 0.6rem; align-items: center; min-height: 48px; }
 .form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
 
-.badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.1rem 0.6rem; border-radius: 999px; border: 2px solid currentColor; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.1rem 0.6rem; border-radius: 999px; border: 2px solid currentColor; font-size: 0.85rem; font-weight: 600; max-width: 100%; white-space: normal; line-height: 1.25; }
 .badge.dashed { border-style: dashed; } .badge.dotted { border-style: dotted; } .badge.double { border-style: double; border-width: 4px; } .badge.fill { background: currentColor; } .badge.fill > * { color: var(--bg); }
 .t-ok { color: var(--ok); } .t-warn { color: var(--warn); } .t-err { color: var(--err); } .t-info { color: var(--info); } .t-live { color: var(--live); } .t-mut { color: var(--tx2); }
 

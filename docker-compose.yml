@@ -46,12 +46,34 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
       SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-8}
+      LOGIN_IP_MAX_FAILURES: ${LOGIN_IP_MAX_FAILURES:-30}
+      LOGIN_IP_WINDOW_MIN: ${LOGIN_IP_WINDOW_MIN:-60}
       SESSION_ABSOLUTE_DAYS: ${SESSION_ABSOLUTE_DAYS:-7}
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+
+  # Dados fictícios para testes. Não sobe junto com a stack: docker compose --profile seed run --rm seed [--reset] [--carga] [--only=copa]
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    # entrypoint (e não command): assim `run --rm seed --carga` repassa as opções ao script em vez de trocar o comando.
+    entrypoint: ["node", "src/seed/run.ts"]
+    restart: "no"
+    environment:
+      API_URL: http://api:3000
+      SEED_EMAIL: ${SEED_EMAIL:-organizador@teste.playtorneios.dev}
+      SEED_PASSWORD: ${SEED_PASSWORD:-SenhaDeTeste#2026}
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     networks: [internal]

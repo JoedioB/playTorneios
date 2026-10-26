@@ -1,10 +1,28 @@
 // Teste de fumaça no Chromium: percorre o fluxo completo do organizador com o app real.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
-const base = process.argv[2];
-const shots = process.argv[3];
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+// Uso: node smoke.cjs [URL_BASE] [PASTA_DE_CAPTURAS]. Sem argumentos, serve a pasta .smoke da raiz do repositório.
+let base = process.argv[2];
+const shots = process.argv[3] || path.join(__dirname, '..', '..', '..', '.smoke', 'shots');
+fs.mkdirSync(shots, { recursive: true });
 
 (async () => {
+  let server;
+  if (!base) {
+    const root = path.join(__dirname, '..', '..', '..', '.smoke');
+    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+    server = http.createServer((req, res) => {
+      const file = path.join(root, decodeURIComponent((req.url || '/').split('?')[0]));
+      if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' });
+      fs.createReadStream(file).pipe(res);
+    });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    base = `http://127.0.0.1:${server.address().port}`;
+  }
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
   const page = await ctx.newPage();
@@ -179,6 +197,44 @@ const shots = process.argv[3];
   }
   log('a11y básica em ' + routes.length + ' rotas (rótulos, h1, landmarks, caption, região viva)');
 
+  // Reflow (WCAG 1.4.10): em 320 px de largura (equivale a 400% de zoom) nenhuma rota rola na horizontal.
+  const vp = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 640 });
+  for (const r of routes) {
+    await page.goto(`${base}/index.html#/${r}`);
+    await page.waitForTimeout(150);
+    const over = await page.evaluate(() => {
+      const w = document.documentElement.clientWidth;
+      const wide = [...document.querySelectorAll('main *')].filter((el) => el.getBoundingClientRect().right > w + 1 && !el.closest('.table-wrap, [data-scroll], pre')).slice(0, 3).map((el) => el.tagName.toLowerCase() + '.' + el.className);
+      return { scroll: document.documentElement.scrollWidth - w, wide };
+    });
+    assert.ok(over.scroll <= 1, `rota #/${r} rola ${over.scroll}px na horizontal em 320px; largos: ${over.wide.join(', ')}`);
+  }
+  await page.setViewportSize(vp || { width: 1280, height: 800 });
+  log('reflow em 320px (400% de zoom) sem rolagem horizontal em ' + routes.length + ' rotas');
+
+  // axe-core (WCAG 2.2 A/AA) nos dois temas. Só roda se @axe-core/playwright estiver instalado (CI instala).
+  let AxeBuilder = null;
+  try { AxeBuilder = require('@axe-core/playwright').default || require('@axe-core/playwright').AxeBuilder; } catch { /* opcional localmente */ }
+  if (!AxeBuilder) {
+    console.log('… axe-core não instalado: etapa pulada (pnpm install no repositório instala)');
+  } else {
+    const report = [];
+    for (const contrast of ['dark', 'light']) {
+      for (const r of routes) {
+        await page.goto(`${base}/index.html#/${r}`);
+        await page.evaluate((c) => { document.documentElement.dataset.contrast = c; }, contrast);
+        await page.waitForTimeout(150);
+        const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+        for (const v of res.violations) report.push({ tema: contrast, rota: '#/' + r, regra: v.id, impacto: v.impact, ajuda: v.help, alvos: v.nodes.slice(0, 3).map((n) => n.target.join(' ')) });
+      }
+    }
+    require('node:fs').writeFileSync(shots + '/axe-report.json', JSON.stringify(report, null, 2));
+    const blocking = report.filter((v) => v.impacto === 'serious' || v.impacto === 'critical');
+    assert.deepEqual(blocking, [], 'axe: violações sérias/críticas (relatório completo em axe-report.json):\n' + JSON.stringify(blocking, null, 2));
+    log(`axe-core: nenhuma violação séria ou crítica em ${routes.length} rotas × 2 temas (${report.length} menores, ver axe-report.json)`);
+  }
+
   // mobile 375px sem rolagem horizontal da página
   const m = await browser.newContext({ viewport: { width: 375, height: 800 } });
   const mp = await m.newPage();
@@ -205,6 +261,16 @@ const shots = process.argv[3];
   await second.close();
   log('segunda aba é barrada');
 
+  // Seletor de torneios: lista o torneio aberto e oferece criar outro (sem clicar: trocar recarrega a página).
+  await page.goto(base + '/index.html#/');
+  await page.getByRole('button', { name: 'Trocar torneio' }).click();
+  const sw = page.getByRole('dialog', { name: 'Seus torneios' });
+  await sw.getByText('Aberto agora').waitFor();
+  await sw.getByRole('button', { name: 'Criar novo torneio' }).waitFor();
+  await page.keyboard.press('Escape');
+  await sw.waitFor({ state: 'hidden' });
+  log('seletor de torneios: mostra o aberto e oferece criar novo');
+
   // Bloqueio por PIN
   await page.goto(base + '/index.html#/sistema');
   await page.getByLabel('PIN (4 a 8 números)').fill('1234');
@@ -226,4 +292,5 @@ const shots = process.argv[3];
   assert.deepEqual(errors, [], errors.join('\n'));
   log('sem erros de console');
   await browser.close();
+  server?.close();
 })().catch((e) => { console.error('FALHOU:', e.message); process.exit(1); });

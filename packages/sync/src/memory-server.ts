@@ -51,8 +51,8 @@ export class MemoryServerStore implements ServerStore {
     return p;
   }
 
-  private tx(): ServerTx {
-    const s = this;
+  private tx(self: MemoryServerStore = this): ServerTx {
+    const s = self;
     return {
       async getState(id) {
         const v = s.states.get(id);

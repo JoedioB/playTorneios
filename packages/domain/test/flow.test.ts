@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, categoryOutcome, DomainError, resolveCategory } from '../src/index.ts';
-import type { Command, TournamentState } from '../src/index.ts';
+import type { Command } from '../src/index.ts';
 import { run, setup } from './helpers.ts';
 
 const win = (matchId: string, winner: 'a' | 'b', id = `res-${matchId}-${Math.random()}`): Command => ({

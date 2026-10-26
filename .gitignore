@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Pacotes de entrega e artefatos de teste
+playtorneios.tar.gz
+.smoke/

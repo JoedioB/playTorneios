@@ -11,7 +11,7 @@ export async function buildReportPdf(state: TournamentState): Promise<Uint8Array
   const W = 595, H = 842, M = 40;
   let page = doc.addPage([W, H]);
   let y = H - M;
-  const clean = (s: string) => s.replace(/[^\x20-\x7E -ÿ]/g, '?');
+  const clean = (s: string) => s.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
   const line = (text: string, o: { size?: number; b?: boolean; gap?: number } = {}) => {
     const size = o.size ?? 10;
     if (y < M + size) { page = doc.addPage([W, H]); y = H - M; }

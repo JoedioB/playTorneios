@@ -5,6 +5,7 @@ import { useRuntime } from '../data/runtime.tsx';
 import { uuid } from '../lib/format.ts';
 import { resizeLogo } from '../lib/logo.ts';
 import { Button, Field, PageHead } from '../ui/kit.tsx';
+import { listKnown, openTournament } from '../lib/tournaments.ts';
 
 function slugify(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'torneio';
@@ -32,6 +33,9 @@ export function Onboarding() {
     <main style={{ margin: '0 auto' }} id="conteudo">
       <h1>Criar torneio</h1>
       <p className="muted">Comece pelo básico. Você pode mudar tudo depois, mesmo sem internet.</p>
+      {listKnown().length > 0 && (
+        <p className="muted">Já tem torneio neste aparelho? {listKnown().map((k) => <Button key={k.id} size="sm" onClick={() => openTournament(k.id)}>{`Voltar para ${k.name}`}</Button>)}</p>
+      )}
       <form className="form-grid" onSubmit={(e) => { e.preventDefault(); void submit(); }} noValidate>
         <Field label="Nome do torneio" error={err.name}>{(p) => <input {...p} value={f.name} onChange={set('name')} autoComplete="off" />}</Field>
         <Field label="Organização" error={err.organizationName}>{(p) => <input {...p} value={f.organizationName} onChange={set('organizationName')} />}</Field>

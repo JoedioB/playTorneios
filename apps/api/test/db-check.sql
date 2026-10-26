@@ -47,4 +47,9 @@ select failed_logins, locked_until > now() as bloqueado from users where id = '3
 insert into sessions(token_hash,user_id,expires_at,last_seen_at) values ('old','33333333-3333-3333-3333-333333333333', now() - interval '1 day', now()), ('ok','33333333-3333-3333-3333-333333333333', now() + interval '1 day', now());
 delete from sessions where expires_at < now() or last_seen_at < now() - ('8' || ' hours')::interval;
 select token_hash as sessoes_restantes from sessions;
+-- limite de login por IP (migração 002)
+insert into login_failures(ip, at) values ('1.2.3.4', now() - interval '70 minutes'), ('1.2.3.4', now() - interval '30 minutes'), ('1.2.3.4', now() - interval '5 minutes'), ('5.6.7.8', now());
+select count(*)::int as falhas_na_janela, min(at) is not null as tem_primeira from login_failures where ip = '1.2.3.4' and at > now() - ('60' || ' minutes')::interval;
+delete from login_failures where at < now() - interval '1 day';
+select count(*)::int as linhas_depois_do_purge from login_failures;
 rollback;

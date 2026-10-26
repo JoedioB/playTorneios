@@ -7,6 +7,7 @@ import { go, useRoute } from '../lib/router.ts';
 import { normalizeSearch } from '@playtorneios/domain';
 import { pairName } from '../lib/format.ts';
 import { Button, Icon, StatusBadge, ToastRegion } from './kit.tsx';
+import { TournamentSwitcher } from './switcher.tsx';
 
 const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon: string }> }> = [
   { group: 'Operação', items: [
@@ -160,6 +161,7 @@ export function Shell(props: { children: ReactNode }) {
         <a className="brand" href="#/">{state.tournament?.name ?? 'playTorneios'}</a>
         <GlobalSearch />
         <Button variant="primary" icon="play" onClick={() => go('/resultados?registrar=1')}>Registrar placar</Button>
+        <TournamentSwitcher currentId={state.tournament?.id} />
         <SyncChip />
         <Button size="sm" icon="sun" pressed={contrast === 'light'} label="Alto contraste claro (uso ao sol)" onClick={() => setContrast(contrast === 'light' ? 'dark' : 'light')}>
           {contrast === 'light' ? 'Tema escuro' : 'Modo sol'}
