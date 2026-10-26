@@ -7,6 +7,7 @@ import { buildBackup, download, parseBackup } from '../lib/backup.ts';
 import type { BackupFile } from '../lib/backup.ts';
 import { buildReportPdf } from '../lib/pdf.ts';
 import { forget } from '../lib/tournaments.ts';
+import { signOut } from '../lib/session.ts';
 import { clearPin, loadLock, setLockMinutes, setPin, validPin } from '../lib/lock.ts';
 import { Button, Dialog, PageHead } from '../ui/kit.tsx';
 
@@ -117,7 +118,7 @@ export function SistemaScreen() {
             <Button onClick={() => void savePin()} disabled={pinInput.length < 4}>{lock ? 'Trocar PIN' : 'Definir PIN'}</Button>
             {lock && <button className="btn" type="button" onClick={() => { clearPin(); setLock(null); }}>Remover PIN</button>}
           </div>
-          <button className="btn" type="button" onClick={async () => { try { await api.post('/api/auth/logout'); } catch { /* sem rede */ } try { localStorage.removeItem('pt:session'); } catch { /* sem armazenamento */ } location.reload(); }}>Sair da conta neste aparelho</button>
+          <button className="btn" type="button" onClick={() => void signOut()}>Sair da conta neste aparelho</button>
         </section>
         <section className="card stack"><h2>Excluir torneio (LGPD)</h2><p className="muted">Apaga o torneio daqui e do servidor, com atletas, resultados e página pública. Não dá para desfazer.</p>
           <Button variant="danger" icon="x" onClick={() => setDelOpen(true)}>Excluir torneio…</Button></section>

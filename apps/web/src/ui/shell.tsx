@@ -6,7 +6,8 @@ import { describeSync } from '../data/runtime.tsx';
 import { go, useRoute } from '../lib/router.ts';
 import { normalizeSearch } from '@playtorneios/domain';
 import { pairName } from '../lib/format.ts';
-import { Button, Icon, StatusBadge, ToastRegion } from './kit.tsx';
+import { Button, Dialog, Icon, StatusBadge, ToastRegion } from './kit.tsx';
+import { signOut } from '../lib/session.ts';
 import { TournamentSwitcher } from './switcher.tsx';
 
 const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon: string }> }> = [
@@ -131,6 +132,8 @@ export function Shell(props: { children: ReactNode }) {
   const { state, announce, sync, storage, session } = useRuntime();
   const route = useRoute();
   const here = '/' + route.path.join('/');
+  const [outOpen, setOutOpen] = useState(false);
+  const unsent = sync.pending + sync.rejected + sync.blocked;
   const [contrast, setContrast] = useState<'dark' | 'light'>(() => {
     try { return localStorage.getItem('pt:contrast') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
   });
@@ -168,6 +171,7 @@ export function Shell(props: { children: ReactNode }) {
           Modo sol
         </Button>
         {session && <span className="muted small">{session.email}</span>}
+        {session && <Button size="sm" onClick={() => (unsent > 0 ? setOutOpen(true) : void signOut())}>Sair</Button>}
       </header>
       <nav className="sidenav" aria-label="Principal">
         {NAV.map((g) => (
@@ -196,6 +200,10 @@ export function Shell(props: { children: ReactNode }) {
       </main>
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" id="sync-live">{announce}</div>
       <ToastRegion />
+      <Dialog open={outOpen} title="Sair da conta" onClose={() => setOutOpen(false)} initialFocus="[data-safe]"
+        footer={<><button className="btn" type="button" data-safe onClick={() => setOutOpen(false)}>Continuar logado</button><Button variant="danger" onClick={() => void signOut()}>Sair mesmo assim</Button></>}>
+        <p>Há {unsent} alteração(ões) ainda não enviadas ao servidor. Elas continuam salvas neste aparelho e são enviadas quando você entrar de novo.</p>
+      </Dialog>
     </div>
   );
 }

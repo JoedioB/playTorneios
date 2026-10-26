@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, HttpError } from './data/http-transport.ts';
+import { SESSION_KEY, signOut } from './lib/session.ts';
 import { useRuntime } from './data/runtime.tsx';
 import { useRoute } from './lib/router.ts';
 import { AgendaScreen } from './screens/agenda.tsx';
@@ -21,7 +22,6 @@ import { Shell } from './ui/shell.tsx';
 import { ToastRegion } from './ui/kit.tsx';
 import { WANT_NEW, clearWanted, rememberCurrent, wantedTournament } from './lib/tournaments.ts';
 
-const SESSION_KEY = 'pt:session';
 
 function Screens() {
   const { path } = useRoute();
@@ -49,12 +49,7 @@ function Screens() {
  * sessão válida (a sessão só é exigida para sincronizar). Sem torneio local, é preciso entrar primeiro.
  */
 export function App() {
-  const out = async () => {
-    try { await api.post('/api/auth/logout'); } catch { /* sem rede: a sessão expira sozinha */ }
-    try { localStorage.removeItem(SESSION_KEY); } catch { /* sem armazenamento */ }
-    location.reload();
-  };
-  return <TabGuard><LockGate onSignOut={() => void out()}><AppInner /></LockGate></TabGuard>;
+  return <TabGuard><LockGate onSignOut={() => void signOut()}><AppInner /></LockGate></TabGuard>;
 }
 
 function AppInner() {

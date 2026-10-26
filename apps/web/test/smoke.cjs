@@ -175,6 +175,8 @@ fs.mkdirSync(shots, { recursive: true });
   const pubText = await page.locator('.preview-light').innerText();
   assert.ok(/Atleta 1A/.test(pubText) && !/84999/.test(pubText));
   log('página pública publicada e pré-visualizada');
+  assert.ok(await page.getByRole('button', { name: 'Sair', exact: true }).first().isVisible(), 'o botão Sair deve estar visível no cabeçalho');
+  log('botão "Sair" visível no cabeçalho');
 
   // acessibilidade básica em todas as rotas
   const routes = ['', 'agenda', 'chaves', 'resultados', 'inscricoes', 'duplas', 'categorias', 'quadras', 'torneio', 'publico', 'relatorios', 'encerramento', 'sync', 'sistema'];
