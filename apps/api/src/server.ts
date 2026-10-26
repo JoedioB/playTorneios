@@ -1,6 +1,7 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createPool, migrate } from './db.ts';
+import { runRetention } from './retention.ts';
 
 const config = loadConfig();
 const pool = createPool(config.DATABASE_URL);
@@ -17,6 +18,14 @@ void purgeSessions();
 void purgeLoginFailures();
 const purgeTimer = setInterval(() => { void purgeSessions(); void purgeLoginFailures(); }, 3_600_000);
 purgeTimer.unref();
+
+// Retenção de dados pessoais: uma vez por dia (e na subida) anonimiza atletas de torneios encerrados há mais de RETENTION_MONTHS.
+const retention = () =>
+  runRetention(pool, config)
+    .then((r) => { if (r.athletes > 0) console.log(`retenção: ${r.athletes} atleta(s) anonimizado(s) em ${r.tournaments} torneio(s)`); })
+    .catch((e) => console.error('retenção falhou', e.message));
+setTimeout(() => void retention(), 60_000).unref();
+setInterval(() => void retention(), 86_400_000).unref();
 
 const stop = async () => {
   await app.close();

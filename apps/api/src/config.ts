@@ -9,6 +9,8 @@ const schema = z.object({
   // Bloqueio por IP: depois de N senhas erradas na janela, o IP recebe 429 (mesmo com a senha certa).
   LOGIN_IP_MAX_FAILURES: z.coerce.number().int().min(1).default(30),
   LOGIN_IP_WINDOW_MIN: z.coerce.number().int().min(1).default(60),
+  // Anonimiza atletas de torneios encerrados há mais de N meses (0 desliga).
+  RETENTION_MONTHS: z.coerce.number().int().min(0).default(12),
   SESSION_IDLE_HOURS: z.coerce.number().default(8),
   SESSION_ABSOLUTE_DAYS: z.coerce.number().default(7),
   COOKIE_SECURE: z

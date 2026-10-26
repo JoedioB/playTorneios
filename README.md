@@ -59,6 +59,13 @@ As regras de dependência entre pastas são verificadas por `test/architecture.t
 
 Rode `pnpm install` uma vez e **faça commit do `pnpm-lock.yaml`** (o CI e as imagens usam instalação congelada).
 
+## Retenção de dados pessoais (LGPD)
+
+A API anonimiza sozinha (uma vez por dia) os atletas de torneios **encerrados há mais de 12 meses**: nome, telefone, nascimento e
+cidade são apagados; partidas, resultados e pódio permanecem. Ajuste com `RETENTION_MONTHS` no `.env` (0 desliga). Para ver o que seria
+anonimizado sem alterar nada: `docker compose run --rm --entrypoint "node src/retention-cli.ts" api --dry-run`. Aparelhos só recebem a
+anonimização na próxima sincronização, e backups em arquivo baixados antes continuam com os dados originais.
+
 ## Vários torneios no mesmo aparelho
 
 O botão **Trocar torneio** (topo do app) abre outro torneio ou cria um novo. Cada torneio tem seu próprio banco local; os que vêm do
