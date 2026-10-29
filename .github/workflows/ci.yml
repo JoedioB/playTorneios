@@ -76,9 +76,10 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.tls.yml config -q
           docker compose -f docker-compose.yml -f docker-compose.tunnel.yml config -q
           docker compose --profile seed config -q
-      - name: Sintaxe do nginx (os dois listeners)
+      - name: Sintaxe do nginx (todos os listeners, config Compose e Railway)
         run: |
           docker run --rm --add-host api:127.0.0.1 playtorneios-web:ci nginx -t
+          docker run --rm -e API_UPSTREAM=http://api.railway.internal:3000 -e 'API_RESOLVER=[fd12::10]' -e API_RESOLVER_OPTS=ipv6=on playtorneios-web:ci nginx -t
       - name: Varredura de vulnerabilidades (Trivy)
         # Imagem oficial do Trivy em vez da action (a tag fixada da action deixou de existir).
         run: |

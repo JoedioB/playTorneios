@@ -279,7 +279,7 @@ O MVP precisa equilibrar simplicidade, confiabilidade e facilidade de manutenç�
 ### DEC-27 — Hospedagem e PostgreSQL
 
 - Status: **Decidida em caráter provisório** (29/10/2026); reavaliar após o piloto.
-- Decisão: servidor próprio (Ubuntu) com Docker Compose e Cloudflare Tunnel, conforme `docs/TUTORIAL_MAQUINA_LOCAL.md`. O requisito mínimo continua sendo executar contêineres Docker e oferecer PostgreSQL com backup. Alternativa documentada: VPS com Caddy (`docker-compose.tls.yml`).
+- Decisão: servidor próprio (Ubuntu) com Docker Compose e Cloudflare Tunnel, conforme `docs/TUTORIAL_MAQUINA_LOCAL.md`. O requisito mínimo continua sendo executar contêineres Docker e oferecer PostgreSQL com backup. Alternativas documentadas: VPS com Caddy (`docker-compose.tls.yml`) e Railway (DEC-31).
 - Justificativa: custo baixo, sem portas abertas no roteador e funcionamento atrás de CGNAT.
 - Consequências: a disponibilidade depende de luz e internet do local; exige backup com cópia externa e restauração testada (`scripts/backup.sh`, `scripts/restore-test.sh`) e monitor externo. Reavaliar com os dados do piloto.
 
@@ -318,6 +318,20 @@ O MVP precisa equilibrar simplicidade, confiabilidade e facilidade de manutenç�
 - Decisão: o telão (`#/telao`) e as súmulas em papel (`#/imprimir`) rodam no próprio aparelho do organizador, a partir do estado local, sem depender do servidor.
 - Justificativa: funcionam com a internet fora, que é o caso em que o papel e a TV mais importam.
 - Consequências: o telão mostra os nomes das duplas como o painel mostra; usar nome de exibição quando houver preocupação com privacidade em tela pública.
+
+### DEC-31 — Hospedagem alternativa: tudo na Railway
+
+- Status: **Proposta**, a validar em ensaio (29/10/2026). Alternativa à DEC-27, não a substitui até o ensaio.
+- Decisão: banco PostgreSQL, API e front (nginx) como três serviços de um projeto na Railway, na mesma origem. Não usar a Vercel para o front.
+- Justificativa:
+  - a arquitetura depende de origem única (cookie `SameSite=Strict`, checagem de CSRF, sem CORS); dividir front e API em domínios exigiria rewrites, mudar a confiança no IP do visitante e reescrever cabeçalhos e cache do PWA;
+  - o plano Hobby da Vercel não permite uso comercial, o que obrigaria o plano Pro;
+  - o front é pequeno e cacheável, então a CDN da Vercel traz pouco ganho.
+- Consequências:
+  - a imagem do `web` ganhou templates de nginx com `API_UPSTREAM`, `API_RESOLVER` e `API_RESOLVER_OPTS`, e um listener 8083 para o proxy da Railway; a `api` aceita `MIGRATE_ON_START=true`;
+  - a configuração fica no painel (o *config as code* da Railway está obsoleto); roteiro em `docs/DEPLOY_RAILWAY.md`;
+  - o IP do visitante vem de `X-Forwarded-For` com a regra do primeiro IP não confiável; precisa de confirmação no ensaio;
+  - dados possivelmente fora do Brasil (revisar com a DEC-26) e backup próprio obrigatório (`BACKUP_DATABASE_URL` em `scripts/backup.sh`).
 
 ## 3. Decisão de adoção tecnológica inicial
 

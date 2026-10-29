@@ -19,8 +19,12 @@ LABEL org.opencontainers.image.title="playtorneios-web" \
 USER root
 RUN apk upgrade --no-cache
 USER 101
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY apps/web/locations.inc /etc/nginx/conf.d/locations.inc
+# Os arquivos em templates/ passam por envsubst na partida (imagem oficial do nginx); só as variáveis API_* são trocadas.
+COPY apps/web/templates/ /etc/nginx/templates/
+ENV NGINX_ENVSUBST_FILTER=^API_ \
+    API_UPSTREAM=http://api:3000 \
+    API_RESOLVER=127.0.0.11 \
+    API_RESOLVER_OPTS=ipv6=off
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1

@@ -100,6 +100,10 @@ No painel, o hostname público do túnel aponta para `HTTP` `web:8082`. Essa por
 então o limite de tentativas de login por IP enxerga cada visitante. Passo a passo completo: `docs/TUTORIAL_MAQUINA_LOCAL.md`.
 Não use junto com `docker-compose.tls.yml`.
 
+## Railway (tudo na nuvem, sem servidor próprio)
+
+Banco, API e front como três serviços de um projeto na Railway, na mesma origem. Roteiro, variáveis e verificação em `docs/DEPLOY_RAILWAY.md` (DEC-31).
+
 ## Operação na quadra
 
 - **Placar na quadra:** `#/placar/<partida>` (botão "Abrir placar" na Central). Botões grandes, desfazer, tela acesa.
