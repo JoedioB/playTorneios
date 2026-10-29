@@ -6,7 +6,7 @@ WORKDIR /repo
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/web ./apps/web
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --filter @playtorneios/web...
+RUN pnpm install --filter @playtorneios/web...
 RUN pnpm --filter @playtorneios/web build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime

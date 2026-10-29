@@ -11,7 +11,7 @@ COPY packages/domain/package.json packages/domain/
 COPY packages/sync/package.json packages/sync/
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+RUN \
     pnpm install --prod --filter @playtorneios/api...
 
 FROM node:22-slim AS runtime
