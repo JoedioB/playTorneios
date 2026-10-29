@@ -42,6 +42,8 @@ export function DuplasScreen() {
   const [err, setErr] = useState('');
   const [anon, setAnon] = useState<string | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
+  const [enroll, setEnroll] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
   const athletes = Object.values(state.athletes).filter((x) => !x.anonymizedAt).sort((x, y) => x.fullName.localeCompare(y.fullName));
   const birthNeeded = Object.values(state.categories).some((c) => c.ageRange && (c.ageRange.min !== undefined || c.ageRange.max !== undefined));
   const pairs = useMemo(() => {
@@ -58,13 +60,17 @@ export function DuplasScreen() {
     }
     const pid = uuid();
     if (!(await run({ type: 'pair.save', payload: { pair: { id: pid, athleteAId: a.id, athleteBId: b.id, displayName: display.trim() || undefined } } }, 'Dupla criada.'))) return;
-    if (catId) await run({ type: 'registration.create', payload: { registrationId: uuid(), categoryId: catId, pairId: pid } }, 'Inscrição criada como pendente.');
+    if (catId) {
+      const enrolled = await run({ type: 'registration.create', payload: { registrationId: uuid(), categoryId: catId, pairId: pid } }, 'Inscrição criada como pendente.');
+      if (!enrolled) setNotice('A dupla foi criada, mas a inscrição não foi feita. Use “Inscrever” na linha da dupla para tentar de novo.');
+    }
     setOpen(false); setA(blankAthlete()); setB(blankAthlete()); setDisplay(''); setCatId('');
   };
 
   return (
     <>
       <PageHead title="Atletas e duplas" actions={<Button variant="primary" icon="plus" onClick={() => setOpen(true)}>Nova dupla</Button>} />
+      {notice && <p className="banner" role="status" style={{ marginBottom: '1rem' }}>{notice} <Button size="sm" onClick={() => setNotice('')}>Entendi</Button></p>}
       <Field label="Buscar dupla ou atleta">{(p) => <input {...p} type="search" value={q} onChange={(e) => setQ(e.target.value)} />}</Field>
       {pairs.length === 0 ? <Empty title="Nenhuma dupla encontrada">Use “Nova dupla” para cadastrar.</Empty> : (
         <div className="scroll-x" role="region" aria-label="Lista de duplas" tabIndex={0} style={{ marginTop: '1rem' }}>
@@ -78,7 +84,10 @@ export function DuplasScreen() {
                 return (
                   <tr key={p.id}>
                     <th scope="row">{pairName(state, p.id)}</th>
-                    <td>{regs.length === 0 ? <span className="muted">Sem inscrição</span> : regs.map((r) => <div key={r.id} className="small">{state.categories[r.categoryId]?.name}: {REG_STATUS_LABEL[r.status]}</div>)}</td>
+                    <td>
+                      {regs.length === 0 ? <span className="muted">Sem inscrição</span> : regs.map((r) => <div key={r.id} className="small">{state.categories[r.categoryId]?.name}: {REG_STATUS_LABEL[r.status]}</div>)}
+                      <div style={{ marginTop: '.25rem' }}><Button size="sm" icon="plus" label={`Inscrever ${pairName(state, p.id)} em uma categoria`} onClick={() => setEnroll(p.id)}>Inscrever</Button></div>
+                    </td>
                     <td>
                       {ids.map((id) => state.athletes[id]).map((at) => at && (
                         <div key={at.id} className="row small">
@@ -103,6 +112,7 @@ export function DuplasScreen() {
           <Field label="Inscrever já em uma categoria (opcional)">{(p) => <select {...p} value={catId} onChange={(e) => setCatId(e.target.value)}><option value="">Não inscrever agora</option>{Object.values(state.categories).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
         </form>
       </Dialog>
+      {enroll && <EnrollDialog pairId={enroll} onClose={() => setEnroll(null)} />}
       {edit && <EditPairDialog pairId={edit} onClose={() => setEdit(null)} birthNeeded={birthNeeded} />}
       <Dialog open={!!anon} title="Anonimizar atleta" onClose={() => setAnon(null)} initialFocus="[data-safe]"
         footer={<><button className="btn" data-safe type="button" onClick={() => setAnon(null)}>Manter dados</button><Button variant="danger" onClick={() => { void run({ type: 'athlete.anonymize', payload: { athleteId: anon! } }, 'Atleta anonimizado.'); setAnon(null); }}>Anonimizar definitivamente</Button></>}>
@@ -115,6 +125,7 @@ export function DuplasScreen() {
 export function InscricoesScreen() {
   const { state, run } = useRuntime();
   const [catId, setCatId] = useState('');
+  const [enrollOpen, setEnrollOpen] = useState(false);
   const cats = Object.values(state.categories).sort((x, y) => x.name.localeCompare(y.name));
   const cid = catId || cats[0]?.id || '';
   const cat = state.categories[cid];
@@ -131,7 +142,8 @@ export function InscricoesScreen() {
   const approved = regs.filter((r) => r.status === 'approved').length;
   return (
     <>
-      <PageHead title="Inscrições e check-in" sub={cat ? `${approved} aprovada(s)${cat.capacity ? ` de ${cat.capacity} vagas` : ''}` : undefined} />
+      <PageHead title="Inscrições e check-in" sub={cat ? `${approved} aprovada(s)${cat.capacity ? ` de ${cat.capacity} vagas` : ''}` : undefined} actions={<Button variant="primary" icon="plus" onClick={() => setEnrollOpen(true)}>Inscrever dupla</Button>} />
+      {enrollOpen && <EnrollDialog categoryId={cid} onClose={() => setEnrollOpen(false)} />}
       <Field label="Categoria">{(p) => <select {...p} value={cid} onChange={(e) => setCatId(e.target.value)}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
       {cat?.lockedAt && <p className="banner" style={{ marginTop: '1rem' }}>A chave desta categoria já foi gerada. Mudanças nas inscrições só valem depois de gerar a chave de novo.</p>}
       <div className="scroll-x" role="region" aria-label="Inscrições da categoria" tabIndex={0} style={{ marginTop: '1rem' }}>
@@ -226,6 +238,42 @@ function EditPairDialog(props: { pairId: string; onClose: () => void; birthNeede
         {swapping && started && (
           <label className="row"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> Entendo que a dupla já jogou: os resultados registrados não mudam, e a troca fica na auditoria.</label>
         )}
+      </form>
+    </Dialog>
+  );
+}
+
+/** Inscreve uma dupla já cadastrada em uma categoria (a inscrição na criação da dupla é opcional). */
+function EnrollDialog(props: { pairId?: string; categoryId?: string; onClose: () => void }) {
+  const { state, run } = useRuntime();
+  const [pid, setPid] = useState(props.pairId ?? '');
+  const [cid, setCid] = useState(props.categoryId ?? '');
+  const [err, setErr] = useState('');
+  const active = (pairId: string, categoryId: string) => Object.values(state.registrations).some((r) => r.pairId === pairId && r.categoryId === categoryId && r.status !== 'canceled');
+  const cats = Object.values(state.categories).filter((c) => !pid || !active(pid, c.id)).sort((x, y) => x.name.localeCompare(y.name));
+  const pairs = Object.values(state.pairs).filter((p) => !cid || !active(p.id, cid)).sort((x, y) => pairName(state, x.id).localeCompare(pairName(state, y.id)));
+  const pair = state.pairs[pid];
+  const cat = state.categories[cid];
+  const warns = pair && cat ? checkEligibility([state.athletes[pair.athleteAId], state.athletes[pair.athleteBId]].filter(Boolean) as any, cat, state.tournament?.startDate ?? '') : [];
+  const submit = async () => {
+    setErr('');
+    if (!pid || !cid) return setErr('Escolha a dupla e a categoria.');
+    if (await run({ type: 'registration.create', payload: { registrationId: uuid(), categoryId: cid, pairId: pid } }, 'Inscrição criada como pendente.')) props.onClose();
+  };
+  return (
+    <Dialog open title="Inscrever dupla" onClose={props.onClose} footer={<><Button onClick={props.onClose}>Cancelar</Button><Button variant="primary" icon="check" onClick={() => void submit()}>Inscrever</Button></>}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+        {err && <p className="error" role="alert">{err}</p>}
+        {props.pairId
+          ? <p>Dupla: <strong>{pairName(state, props.pairId)}</strong></p>
+          : <Field label="Dupla">{(p) => <select {...p} value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Escolha a dupla</option>{pairs.map((x) => <option key={x.id} value={x.id}>{pairName(state, x.id)}</option>)}</select>}</Field>}
+        {props.categoryId
+          ? <p>Categoria: <strong>{state.categories[props.categoryId]?.name}</strong></p>
+          : (cats.length === 0
+            ? <p className="muted">Esta dupla já está inscrita em todas as categorias.</p>
+            : <Field label="Categoria">{(p) => <select {...p} value={cid} onChange={(e) => setCid(e.target.value)}><option value="">Escolha a categoria</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>)}
+        {warns.map((w) => <p key={w.code + w.athleteId} className="small t-warn"><span aria-hidden="true">⚠ </span>{w.message}</p>)}
+        {cat?.lockedAt && <p className="banner">A chave desta categoria já foi gerada. A inscrição só vale depois de gerar a chave de novo.</p>}
       </form>
     </Dialog>
   );

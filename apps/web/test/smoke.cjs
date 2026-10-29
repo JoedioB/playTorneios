@@ -66,11 +66,18 @@ fs.mkdirSync(shots, { recursive: true });
     const names = page.getByLabel('Nome completo');
     await names.nth(0).fill(`Atleta ${i}A`);
     await names.nth(1).fill(`Atleta ${i}B`);
-    await page.getByLabel('Inscrever já em uma categoria (opcional)').selectOption({ label: 'Aberta' });
+    // A 4ª dupla é criada sem categoria e inscrita depois, pelo botão "Inscrever" (antes ficava sem saída).
+    if (i < 4) await page.getByLabel('Inscrever já em uma categoria (opcional)').selectOption({ label: 'Aberta' });
     await page.getByRole('button', { name: 'Criar dupla' }).click();
     await page.getByText(`Atleta ${i}A / Atleta ${i}B`).waitFor();
   }
-  log('4 duplas inscritas');
+  await page.getByText('Sem inscrição').waitFor();
+  await page.getByRole('button', { name: /^Inscrever Atleta 4A \/ Atleta 4B/ }).click();
+  await page.getByRole('dialog').getByLabel('Categoria').selectOption({ label: 'Aberta' });
+  await page.getByRole('dialog').getByRole('button', { name: 'Inscrever', exact: true }).click();
+  await page.getByText('Inscrição criada como pendente.').waitFor();
+  await page.waitForFunction(() => !document.body.innerText.includes('Sem inscrição'));
+  log('4 duplas inscritas (uma delas depois da criação)');
 
   // Inscrições
   await page.goto(base + '/index.html#/inscricoes');
