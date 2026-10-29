@@ -96,7 +96,7 @@ export function SistemaScreen() {
   };
   return (
     <>
-      <PageHead title="Backup e preparação" />
+      <PageHead title="Backup e segurança" />
       <div className="grid">
         <section className="card stack"><h2>Backup</h2><p className="muted">Guarde uma cópia completa (inclui a fila de envio). Faça antes do evento e depois de cada dia.</p>
           <Button variant="primary" icon="download" onClick={async () => { download(`playtorneios-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', JSON.stringify(await buildBackup(engine), null, 2)); toast({ text: 'Backup baixado.', kind: 'ok' }); }}>Baixar backup</Button></section>

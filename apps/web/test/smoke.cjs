@@ -42,6 +42,17 @@ fs.mkdirSync(shots, { recursive: true });
   await page.getByRole('heading', { name: 'Central', exact: true }).waitFor();
   log('torneio criado (offline-first, sem servidor de dados)');
 
+  // Navegação: ordem do ciclo de vida, aviso de pré-requisito e próximo passo na Central
+  const nav = page.getByRole('navigation', { name: 'Principal' });
+  assert.deepEqual(
+    await nav.getByRole('link').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
+    ['#/', '#/torneio', '#/quadras', '#/categorias', '#/duplas', '#/inscricoes', '#/chaves', '#/agenda', '#/resultados', '#/juizes', '#/telao', '#/imprimir', '#/publico', '#/relatorios', '#/encerramento', '#/sync', '#/sistema'],
+    'ordem do menu = ciclo de vida do torneio');
+  assert.equal(await nav.locator('[aria-current="page"]').count(), 1, 'um único item com aria-current');
+  await nav.getByRole('link', { name: /^Chaves/ }).getByText('Crie categorias antes').waitFor();
+  await page.locator('li.step[aria-current="step"]').getByText('Quadras', { exact: true }).waitFor();
+  log('menu na ordem do ciclo de vida; Central aponta o próximo passo (Quadras)');
+
   // Quadras
   await page.goto(base + '/index.html#/quadras');
   for (const n of ['Quadra 1', 'Quadra 2']) {
@@ -50,6 +61,9 @@ fs.mkdirSync(shots, { recursive: true });
     await page.getByText(n, { exact: true }).first().waitFor();
   }
   log('quadras');
+  await page.goto(base + '/index.html#/');
+  await page.locator('li.step[aria-current="step"]').getByText('Categorias e regras', { exact: true }).waitFor();
+  log('Central avança o próximo passo para Categorias');
 
   // Categoria
   await page.goto(base + '/index.html#/categorias');
@@ -248,6 +262,21 @@ fs.mkdirSync(shots, { recursive: true });
   }
   await page.setViewportSize(vp || { width: 1280, height: 800 });
   log('reflow em 320px (400% de zoom) sem rolagem horizontal em ' + routes.length + ' rotas');
+
+  // Menu recolhido em telas estreitas: barra compacta, abre/fecha, navega e fecha ao escolher
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto(`${base}/index.html#/`);
+  const menuBtn = page.getByRole('button', { name: 'Menu' });
+  assert.equal(await menuBtn.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.getByRole('navigation', { name: 'Principal' }).isVisible(), false, 'menu fechado em 375px');
+  assert.ok((await page.locator('.topbar').boundingBox()).height < 140, 'barra superior compacta em 375px');
+  await menuBtn.click();
+  assert.equal(await menuBtn.getAttribute('aria-expanded'), 'true');
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: /^Quadras/ }).click();
+  await page.getByRole('heading', { name: 'Quadras', exact: true }).waitFor();
+  assert.equal(await menuBtn.getAttribute('aria-expanded'), 'false', 'menu fecha ao navegar');
+  await page.setViewportSize(vp || { width: 1280, height: 800 });
+  log('menu recolhido em 375px: abre, navega e fecha');
 
   // axe-core (WCAG 2.2 A/AA) nos dois temas. Só roda se @axe-core/playwright estiver instalado (CI instala).
   let AxeBuilder = null;

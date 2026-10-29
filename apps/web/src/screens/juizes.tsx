@@ -55,7 +55,7 @@ export function JuizesScreen() {
 
   return (
     <>
-      <PageHead title="Juízes" sub="Um link por juiz (gere vários na mesma quadra se houver revezamento). Quem abre o link lança os pontos daquela quadra, sem criar conta." />
+      <PageHead title="Links dos juízes" sub="Um link por juiz (gere vários na mesma quadra se houver revezamento). Quem abre o link lança os pontos daquela quadra, sem criar conta." />
       {!session && <p className="banner" role="status">Entre na sua conta para gerar links. Eles dependem do servidor.</p>}
       {courts.length === 0 ? <Empty title="Nenhuma quadra cadastrada">Cadastre as quadras para gerar um link por quadra.</Empty> : (
         <ul className="stack" style={{ listStyle: 'none', padding: 0 }}>

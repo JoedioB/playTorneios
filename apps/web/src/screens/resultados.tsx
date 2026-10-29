@@ -21,7 +21,7 @@ export function ResultadosScreen() {
   const all = useMemo(() => Object.values(state.matches).filter((m) => m.categoryId === cid).sort((a, b) => (a.scheduledAt ?? 'z').localeCompare(b.scheduledAt ?? 'z') || a.phase.localeCompare(b.phase) || a.round - b.round || a.indexInRound - b.indexInRound), [state.matches, cid]);
   const list = all.filter((m) => !res?.matches[m.id]?.autoBye).filter((m) => filter === 'todas' || (filter === 'finalizadas' ? m.lifecycle === 'finished' : m.lifecycle !== 'finished'));
   const live = all.filter((m) => m.lifecycle === 'in_progress');
-  if (cats.length === 0) return (<><PageHead title="Resultados e classificação" /><Empty title="Nenhuma categoria ainda" /></>);
+  if (cats.length === 0) return (<><PageHead title="Resultados" /><Empty title="Nenhuma categoria ainda" /></>);
 
   const sides = (m: Match) => {
     const rm = res?.matches[m.id];
@@ -30,7 +30,7 @@ export function ResultadosScreen() {
   };
   return (
     <>
-      <PageHead title="Resultados e classificação" />
+      <PageHead title="Resultados" />
       <div className="row">
         <Field label="Categoria">{(p) => <select {...p} value={cid} onChange={(e) => setCatId(e.target.value)}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
         <div className="tabs" role="group" aria-label="Filtro de partidas">

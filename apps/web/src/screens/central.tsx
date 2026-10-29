@@ -3,7 +3,9 @@ import { detectScheduleIssues } from '@playtorneios/domain';
 import { useRuntime } from '../data/runtime.tsx';
 import { fmtTime, pairName } from '../lib/format.ts';
 import { go } from '../lib/router.ts';
-import { Button, PageHead } from '../ui/kit.tsx';
+import { setupSteps } from '../lib/steps.ts';
+import type { Step } from '../lib/steps.ts';
+import { Button, PageHead, StatusBadge } from '../ui/kit.tsx';
 import { MatchStatus, ScoreDialog, useResolution } from './common.tsx';
 
 function AlertCard(props: { tone: 'warn' | 'err' | 'ok' | 'info'; count: number; label: string; to: string }) {
@@ -44,6 +46,28 @@ export function LiveCard(props: { matchId: string; onFinish: (id: string) => voi
   );
 }
 
+function NextSteps(props: { steps: Step[]; next?: Step }) {
+  return (
+    <ol className="steps">
+      {props.steps.map((s, i) => {
+        const isNext = s === props.next;
+        return (
+          <li key={s.key} className={`step${isNext ? ' next' : ''}`} aria-current={isNext ? 'step' : undefined}>
+            <span className="step-n num" aria-hidden="true">{i + 1}</span>
+            <div className="grow">
+              {isNext ? <strong>{s.title}</strong> : <a href={`#${s.to}`}><strong>{s.title}</strong></a>}
+              {s.optional && <span className="muted small"> · no dia do evento</span>}
+              <div className="small muted">{s.detail}</div>
+            </div>
+            {s.done ? <StatusBadge icon="check" tone="ok">Concluído</StatusBadge> : <StatusBadge icon="clock" tone="warn" shape="dashed">{isNext ? 'Próximo passo' : 'Pendente'}</StatusBadge>}
+            {isNext && <a className="btn primary" href={`#${s.to}`}>{s.cta}</a>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function CentralScreen() {
   const { state, run, toast } = useRuntime();
   const [scoreId, setScoreId] = useState<string | null>(null);
@@ -60,9 +84,30 @@ export function CentralScreen() {
     .sort((x, y) => (x.scheduledAt as string).localeCompare(y.scheduledAt as string))
     .slice(0, 5);
   const url = `${location.origin}/p/${t.slug}`;
+  const steps = useMemo(() => setupSteps(state), [state]);
+  const required = steps.filter((x) => !x.optional);
+  const next = steps.find((x) => !x.done && !x.optional) ?? steps.find((x) => !x.done);
+  const started = matches.some((m) => m.lifecycle !== 'not_started');
+  const real = matches.filter((m) => m.slotA.kind !== 'bye' && m.slotB.kind !== 'bye');
+  const allDone = real.length > 0 && real.every((m) => m.lifecycle === 'finished');
+  const progress = `${required.filter((x) => x.done).length} de ${required.length} passos concluídos`;
   return (
     <>
       <PageHead title="Central" sub={`${t.name} · ${t.city}`} />
+      {!started && (
+        <section className="card stack" aria-labelledby="passos" style={{ marginBottom: '1.5rem' }}>
+          <h2 id="passos">Preparação do torneio</h2>
+          <p className="muted">{progress}. {next ? 'Siga a ordem sugerida abaixo.' : 'Tudo pronto: inicie a primeira partida na Agenda ou aqui, em Próximos jogos.'}</p>
+          <NextSteps steps={steps} next={next} />
+        </section>
+      )}
+      {allDone && t.status !== 'closed' && (
+        <section className="card stack" aria-labelledby="fim" style={{ marginBottom: '1.5rem' }}>
+          <h2 id="fim">Todas as partidas têm resultado</h2>
+          <p className="muted">Confira o pódio, atualize a página pública e encerre o torneio.</p>
+          <div className="row"><a className="btn" href="#/resultados">Ver pódio</a><a className="btn" href="#/publico">Página pública</a><a className="btn primary" href="#/encerramento">Encerrar torneio</a></div>
+        </section>
+      )}
       <section aria-label="Alertas" className="grid">
         <AlertCard tone={issues.length ? 'err' : 'ok'} count={issues.length} label="Conflitos de agenda" to="/agenda" />
         <AlertCard tone="warn" count={notDone} label="Partidas sem resultado" to="/resultados" />
@@ -97,6 +142,12 @@ export function CentralScreen() {
           }}>Copiar endereço</Button>
         )}
       </section>
+      {started && (
+        <details className="card" style={{ marginTop: '1.5rem' }}>
+          <summary><strong>Preparação do torneio</strong> <span className="muted small">· {progress}</span></summary>
+          <div style={{ marginTop: '0.75rem' }}><NextSteps steps={steps} next={next} /></div>
+        </details>
+      )}
       <ScoreDialog matchId={scoreId} onClose={() => setScoreId(null)} />
     </>
   );

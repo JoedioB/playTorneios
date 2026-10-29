@@ -803,26 +803,30 @@ Regras: raio de 6 a 8 px; sem sombras decorativas além do brilho do placar (≤
 
 ### 11.2 Mapa de navegação e rotas
 
-Barra lateral em dois grupos, mais a barra superior fixa (busca global, estado de sync, atalho de placar).
+Barra lateral em seções que seguem o ciclo de vida do torneio (preparar, inscrever, chaves e agenda, dia do evento, depois do evento, sistema), mais a barra superior fixa (busca global, estado de sync, atalho de placar). A ordem e os rótulos foram revistos em 29/10/2026 após auditoria de UX.
 
-| Grupo | Item | Rota | Mockup |
+| Seção | Item | Rota | Observação |
 |---|---|---|---|
-| Operação | Central | `/t/:id` | ✔ |
-| | Agenda | `/t/:id/agenda` | ✔ |
-| | Chaves | `/t/:id/chaves/:categoryId?` | ✔ |
-| | Resultados e classificação | `/t/:id/resultados` | parcial |
-| Preparação | Inscrições e check-in | `/t/:id/inscricoes` | novo |
-| | Atletas e duplas | `/t/:id/duplas` | novo |
-| | Categorias e regras | `/t/:id/categorias` | novo |
-| | Quadras | `/t/:id/quadras` | novo |
-| Publicação | Página pública | `/t/:id/publico` | ✔ |
-| | Relatórios | `/t/:id/relatorios` | novo |
-| | Encerramento | `/t/:id/encerramento` | novo |
-| Sistema | Sincronização | `/sync` | diálogo no mockup |
-| | Backup e preparação | `/sistema` | novo |
-| | Login e bloqueio | `/login`, `/bloqueio` | novo |
+| (sem rótulo) | Central | `/t/:id` | Mostra o próximo passo da preparação |
+| Preparar | Dados do torneio | `/t/:id/torneio` | Passo 1 |
+| | Quadras | `/t/:id/quadras` | Pré-requisito da Agenda |
+| | Categorias e regras | `/t/:id/categorias` | Pré-requisito de inscrições e chaves |
+| Inscrições | Atletas e duplas | `/t/:id/duplas` | Cadastro e “Inscrever” em categoria |
+| | Inscrições e check-in | `/t/:id/inscricoes` | Aprovar, lista de espera, check-in |
+| Chaves e agenda | Chaves | `/t/:id/chaves/:categoryId?` | |
+| | Agenda | `/t/:id/agenda` | |
+| Dia do evento | Resultados | `/t/:id/resultados` | Partidas e pódio |
+| | Links dos juízes | `/t/:id/juizes` | Link e QR por quadra (DEC-29) |
+| | Telão | `/t/:id/telao` | Tela cheia (DEC-30) |
+| | Imprimir súmulas | `/t/:id/imprimir` | Reserva em papel |
+| Depois do evento | Página pública | `/t/:id/publico` | |
+| | Relatórios | `/t/:id/relatorios` | |
+| | Encerramento | `/t/:id/encerramento` | |
+| Sistema | Sincronização | `/sync` | |
+| | Backup e segurança | `/sistema` | Backup, PIN e dados pessoais |
+| | Login e bloqueio | `/login`, `/bloqueio` | |
 
-Em telas estreitas a barra lateral vira barra superior rolável com ícone e texto (o mockup já faz isso). As telas **novas** seguem os mesmos componentes e tokens, sem criar padrões novos.
+Cada item pode mostrar uma segunda linha curta quando falta um pré-requisito (“Crie categorias antes”) ou há pendência (“2 a aprovar”); nenhum item some. Em telas estreitas (até 52 rem) o menu fica recolhido atrás do botão **Menu**, com a lista vertical por seções. A Central traz o cartão “Preparação do torneio”, com os passos deduzidos do estado local e o próximo passo destacado. As telas **novas** seguem os mesmos componentes e tokens, sem criar padrões novos.
 
 ### 11.3 Componentes
 

@@ -10,7 +10,7 @@ Preparação (10 min):
 1. Servidor no ar (ver `docs/TUTORIAL_MAQUINA_LOCAL.md`) com `ALLOW_SIGNUP=true` só para o ensaio.
 2. `docker compose --profile seed run --rm seed --reset --only=copa` (nunca em produção: cria conta com senha conhecida).
 3. No computador do organizador, entre com a conta de teste. A Copa tem agenda em 3 quadras.
-4. Em **Juízes (placar)**, gere um link por quadra, com o nome de cada juiz de teste, e leia o QR com cada celular.
+4. Em **Links dos juízes**, gere um link por quadra, com o nome de cada juiz de teste, e leia o QR com cada celular.
 
 Roteiro (marque cada item):
 
@@ -66,7 +66,7 @@ Na véspera:
 - [ ] Links dos juízes gerados, um por juiz, e QR impresso ou enviado só a cada juiz.
 - [ ] Súmulas impressas (reserva) para cada quadra.
 - [ ] Aparelho do organizador com o app aberto, instalado, com bateria e carregador; PIN de bloqueio definido.
-- [ ] Backup local do app exportado (Backup e preparação).
+- [ ] Backup local do app exportado (Backup e segurança).
 
 No local, antes do primeiro jogo:
 - [ ] wi-fi testado em cada quadra com o celular do juiz.

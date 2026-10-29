@@ -1,6 +1,6 @@
 # Roteiro de auditoria de acessibilidade (manual)
 
-Alvo: WCAG 2.2 AA. O que dá para automatizar já roda no CI (`pnpm test:web`: rótulos, h1, landmarks, reflow em 320 px e axe-core nas 14 rotas × 2 temas). Este roteiro cobre o que máquina não pega. Use os dados do seed (`pnpm seed --carga`) e preencha a tabela no fim.
+Alvo: WCAG 2.2 AA. O que dá para automatizar já roda no CI (`pnpm test:web`: rótulos, h1, landmarks, reflow em 320 px e axe-core nas 16 rotas × 2 temas). Este roteiro cobre o que máquina não pega. Use os dados do seed (`pnpm seed --carga`) e preencha a tabela no fim.
 
 ## Preparação
 - Navegador/leitor: Windows: NVDA + Firefox e NVDA + Chrome. macOS: VoiceOver + Safari. iPhone: VoiceOver + Safari. Android: TalkBack + Chrome (opcional).

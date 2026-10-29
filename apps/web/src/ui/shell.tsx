@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { deriveTheme } from '@playtorneios/domain';
+import { deriveTheme, detectScheduleIssues } from '@playtorneios/domain';
 import { useRuntime } from '../data/runtime.tsx';
 import { describeSync } from '../data/runtime.tsx';
 import { go, useRoute } from '../lib/router.ts';
@@ -10,33 +10,69 @@ import { Button, Dialog, Icon, StatusBadge, ToastRegion } from './kit.tsx';
 import { signOut } from '../lib/session.ts';
 import { TournamentSwitcher } from './switcher.tsx';
 
-const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon: string }> }> = [
-  { group: 'Operação', items: [
+type NavItem = { to: string; label: string; icon: string };
+/** Ordem = ciclo de vida do torneio: preparar, inscrever, chaves e agenda, evento, depois. */
+const NAV: Array<{ group: string | null; items: NavItem[] }> = [
+  { group: null, items: [
     { to: '/', label: 'Central', icon: 'home' },
-    { to: '/agenda', label: 'Agenda', icon: 'calendar' },
-    { to: '/chaves', label: 'Chaves', icon: 'bracket' },
-    { to: '/resultados', label: 'Resultados e classificação', icon: 'trophy' },
-    { to: '/telao', label: 'Telão (TV)', icon: 'globe' },
-    { to: '/imprimir', label: 'Imprimir súmulas', icon: 'list' },
   ] },
-  { group: 'Preparação', items: [
-    { to: '/inscricoes', label: 'Inscrições e check-in', icon: 'list' },
-    { to: '/duplas', label: 'Atletas e duplas', icon: 'users' },
-    { to: '/categorias', label: 'Categorias e regras', icon: 'settings' },
-    { to: '/quadras', label: 'Quadras', icon: 'court' },
-    { to: '/juizes', label: 'Juízes (placar)', icon: 'flag' },
+  { group: 'Preparar', items: [
     { to: '/torneio', label: 'Dados do torneio', icon: 'flag' },
+    { to: '/quadras', label: 'Quadras', icon: 'court' },
+    { to: '/categorias', label: 'Categorias e regras', icon: 'list' },
   ] },
-  { group: 'Publicação', items: [
+  { group: 'Inscrições', items: [
+    { to: '/duplas', label: 'Atletas e duplas', icon: 'users' },
+    { to: '/inscricoes', label: 'Inscrições e check-in', icon: 'check-circle' },
+  ] },
+  { group: 'Chaves e agenda', items: [
+    { to: '/chaves', label: 'Chaves', icon: 'bracket' },
+    { to: '/agenda', label: 'Agenda', icon: 'calendar' },
+  ] },
+  { group: 'Dia do evento', items: [
+    { to: '/resultados', label: 'Resultados', icon: 'trophy' },
+    { to: '/juizes', label: 'Links dos juízes', icon: 'play' },
+    { to: '/telao', label: 'Telão', icon: 'signal' },
+    { to: '/imprimir', label: 'Imprimir súmulas', icon: 'copy' },
+  ] },
+  { group: 'Depois do evento', items: [
     { to: '/publico', label: 'Página pública', icon: 'globe' },
     { to: '/relatorios', label: 'Relatórios', icon: 'download' },
     { to: '/encerramento', label: 'Encerramento', icon: 'lock' },
   ] },
   { group: 'Sistema', items: [
     { to: '/sync', label: 'Sincronização', icon: 'sync' },
-    { to: '/sistema', label: 'Backup e preparação', icon: 'settings' },
+    { to: '/sistema', label: 'Backup e segurança', icon: 'settings' },
   ] },
 ];
+
+/**
+ * Avisos curtos sob o item do menu: dizem o que falta antes de usar a tela (ou o que está pendente),
+ * sem esconder nem desabilitar o item. Entram no nome acessível do link.
+ */
+function useNavNotes(): Record<string, { text: string; warn?: boolean }> {
+  const { state } = useRuntime();
+  return useMemo(() => {
+    const regs = Object.values(state.registrations);
+    const cats = Object.keys(state.categories).length;
+    const courts = Object.keys(state.courts).length;
+    const matches = Object.keys(state.matches).length;
+    const pending = regs.filter((r) => r.status === 'pending').length;
+    const ready = Object.keys(state.categories).some((id) => regs.filter((r) => r.categoryId === id && r.status === 'approved').length >= 2);
+    const conflicts = matches ? detectScheduleIssues(state).length : 0;
+    const n: Record<string, { text: string; warn?: boolean }> = {};
+    if (!cats) n['/inscricoes'] = { text: 'Crie categorias antes' };
+    else if (pending) n['/inscricoes'] = { text: `${pending} a aprovar`, warn: true };
+    if (!cats) n['/chaves'] = { text: 'Crie categorias antes' };
+    else if (!ready) n['/chaves'] = { text: 'Aprove 2 duplas' };
+    if (!courts) n['/agenda'] = { text: 'Cadastre quadras antes' };
+    else if (!matches) n['/agenda'] = { text: 'Gere as chaves antes' };
+    else if (conflicts) n['/agenda'] = { text: `${conflicts} conflito(s)`, warn: true };
+    if (!matches) { n['/resultados'] = { text: 'Gere as chaves antes' }; n['/imprimir'] = { text: 'Gere as chaves antes' }; }
+    if (!courts) { n['/juizes'] = { text: 'Cadastre quadras antes' }; n['/telao'] = { text: 'Cadastre quadras antes' }; }
+    return n;
+  }, [state]);
+}
 
 export function SyncChip() {
   const { sync } = useRuntime();
@@ -136,6 +172,9 @@ export function Shell(props: { children: ReactNode }) {
   const route = useRoute();
   const here = '/' + route.path.join('/');
   const [outOpen, setOutOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const bar = useRef<HTMLElement>(null);
+  const notes = useNavNotes();
   const unsent = sync.pending + sync.rejected + sync.blocked;
   const [contrast, setContrast] = useState<'dark' | 'light'>(() => {
     try { return localStorage.getItem('pt:contrast') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
@@ -156,42 +195,75 @@ export function Shell(props: { children: ReactNode }) {
     else { r.removeProperty('--amber'); r.removeProperty('--on-amber'); }
   }, [state.tournament?.theme, contrast]);
 
+  // Menu recolhido (telas estreitas): fecha ao trocar de rota e com Esc.
+  useEffect(() => { setMenu(false); }, [here]);
+  useEffect(() => {
+    if (!menu) return;
+    const on = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false); };
+    addEventListener('keydown', on);
+    return () => removeEventListener('keydown', on);
+  }, [menu]);
+  // Altura real da barra superior (ela quebra linha): usada no scroll-padding e no menu lateral fixo.
+  useEffect(() => {
+    const el = bar.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const set = () => document.documentElement.style.setProperty('--topbar-h', getComputedStyle(el).position === 'sticky' ? `${el.offsetHeight}px` : '0px');
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => { ro.disconnect(); document.documentElement.style.removeProperty('--topbar-h'); };
+  }, []);
+
   useEffect(() => {
     const h = document.querySelector('main h1') as HTMLElement | null;
     document.title = `${h?.textContent ? h.textContent + ' · ' : ''}${state.tournament?.name ?? 'playTorneios'}`;
   }, [here, state.tournament?.name]);
 
   return (
-    <div className="shell">
+    <div className="shell" data-menu={menu ? 'open' : 'closed'}>
       <a className="skip" href="#conteudo" onClick={(e) => { e.preventDefault(); document.getElementById("conteudo")?.focus(); }}>Ir para o conteúdo</a>
-      <header className="topbar">
+      <header className="topbar" ref={bar}>
         <a className="brand" href="#/">{state.tournament?.name ?? 'playTorneios'}</a>
-        <GlobalSearch />
+        <button type="button" className="btn sm menu-btn" aria-expanded={menu} aria-controls="menu-principal" onClick={() => setMenu((v) => !v)}>
+          <Icon name="list" />Menu
+        </button>
         <Button variant="primary" icon="play" onClick={() => go('/resultados?registrar=1')}>Registrar placar</Button>
-        <TournamentSwitcher currentId={state.tournament?.id} />
         <SyncChip />
-        <Button size="sm" icon="sun" pressed={contrast === 'light'} onClick={() => setContrast(contrast === 'light' ? 'dark' : 'light')}>
-          Modo sol
-        </Button>
-        {session && <span className="muted small">{session.email}</span>}
-        {session && <Button size="sm" onClick={() => (unsent > 0 ? setOutOpen(true) : void signOut())}>Sair</Button>}
+        <div className="topbar-extra">
+          <GlobalSearch />
+          <TournamentSwitcher currentId={state.tournament?.id} />
+          <Button size="sm" icon="sun" pressed={contrast === 'light'} onClick={() => setContrast(contrast === 'light' ? 'dark' : 'light')}>
+            Modo sol
+          </Button>
+          {session && <span className="muted small">{session.email}</span>}
+          {session && <Button size="sm" onClick={() => (unsent > 0 ? setOutOpen(true) : void signOut())}>Sair</Button>}
+        </div>
       </header>
-      <nav className="sidenav" aria-label="Principal">
-        {NAV.map((g) => (
-          <div key={g.group}>
-            <h2>{g.group}</h2>
-            <ul>
-              {g.items.map((i) => {
-                const active = i.to === '/' ? here === '/' : here === i.to || here.startsWith(i.to + '/');
-                return (
-                  <li key={i.to}>
-                    <a href={`#${i.to}`} aria-current={active ? 'page' : undefined}><Icon name={i.icon} />{i.label}</a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+      <nav className="sidenav" id="menu-principal" aria-label="Principal" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenu(false); }}>
+        <div className="sidenav-in">
+          {NAV.map((g) => (
+            <div key={g.group ?? 'inicio'}>
+              {g.group && <h2>{g.group}</h2>}
+              <ul>
+                {g.items.map((i) => {
+                  const active = i.to === '/' ? here === '/' : here === i.to || here.startsWith(i.to + '/');
+                  const note = notes[i.to];
+                  return (
+                    <li key={i.to}>
+                      <a href={`#${i.to}`} aria-current={active ? 'page' : undefined}>
+                        <Icon name={i.icon} />
+                        <span>
+                          {i.label}
+                          {note && <><span className="sr-only">: </span><small className={`navnote${note.warn ? ' warn' : ''}`}>{note.text}</small></>}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </nav>
       <main id="conteudo" tabIndex={-1}>
         {sync.ui === 'conflict' && (

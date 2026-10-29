@@ -27,7 +27,7 @@ void navigator.storage?.persist?.();
 const updateSW = registerSW({
   onNeedRefresh() {
     const el = document.getElementById('sync-live');
-    if (el) el.textContent = 'Nova versão disponível. Abra Backup e preparação para atualizar quando a fila estiver vazia.';
+    if (el) el.textContent = 'Nova versão disponível. Abra Backup e segurança para atualizar quando a fila estiver vazia.';
     (window as unknown as { __ptUpdate?: () => Promise<void> }).__ptUpdate = () => updateSW(true);
   },
 });
