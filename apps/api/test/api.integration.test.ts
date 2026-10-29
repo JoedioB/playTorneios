@@ -344,14 +344,17 @@ if (!url) {
       // visão mínima: só a quadra dele e nenhum dado pessoal
       const view = await call('/api/referee/court', { headers: auth });
       assert.equal(view.statusCode, 200, view.body);
-      const v = view.json() as { matches: Array<{ id: string }>; court: { id: string } };
+      const v = view.json() as { matches: Array<{ id: string; status: string; ready: boolean }>; court: { id: string } };
       assert.equal(v.court.id, mine.courtId);
-      assert.ok(v.matches.some((m) => m.id === mine.id));
+      assert.ok(v.matches.length > 0, 'a quadra tem partidas na visão do juiz');
+      // a visão é limitada (próximas + encerradas recentes): toda partida exibida é da quadra do link
+      for (const m of v.matches) assert.equal(st.matches[m.id]?.courtId, mine.courtId, 'só partidas da quadra do link');
       if (other) assert.ok(!v.matches.some((m) => m.id === other.id));
+      const target = v.matches.find((m) => m.status !== 'finished' && m.ready) ?? v.matches[0]!;
       for (const needle of ['phone', 'birthDate', 'email', '(00)']) assert.ok(!view.body.includes(needle), needle);
 
       // escrita: quadra dele passa; outra quadra e tipos fora da lista não
-      const start = await call('/api/referee/push', { headers: auth, body: { commands: [{ opId: randomUUID(), type: 'match.start', payload: { matchId: mine.id } }] } });
+      const start = await call('/api/referee/push', { headers: auth, body: { commands: [{ opId: randomUUID(), type: 'match.start', payload: { matchId: target.id } }] } });
       assert.equal(start.statusCode, 200, start.body);
       assert.equal(start.json().results.length, 1, start.body);
       if (other) {

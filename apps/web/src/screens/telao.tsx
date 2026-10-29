@@ -40,7 +40,7 @@ export function TelaoScreen() {
             <h2>{court.name}</h2>
             {live.length === 0 ? <p className="tv-idle">Livre</p> : live.map((m) => {
               const rule = ruleFor(state, m);
-              const lv = m.live ?? { a: 0, b: 0 };
+              const lv: { a: number; b: number; sets?: Array<{ a: number; b: number }> } = m.live ?? { a: 0, b: 0 };
               return (
                 <article key={m.id} className="tv-live" aria-label={`Em jogo: ${m.label}`}>
                   <p className="muted">{state.categories[m.categoryId]?.name} · {m.label}{rule ? ` · ${describeRule(rule)}` : ''}</p>
