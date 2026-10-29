@@ -107,6 +107,11 @@ Não use junto com `docker-compose.tls.yml`.
 - **Telão:** `#/telao`, para TV ou projetor: o que está em jogo em cada quadra e os próximos chamados.
 - **Súmulas em papel:** `#/imprimir`, folhas de reserva por quadra.
 
+## Backup, ensaio e checklist
+
+- `scripts/backup.sh` e `scripts/restore-test.sh`: backup validado e ensaio de restauração em banco temporário.
+- `docs/ENSAIO_E_CHECKLIST.md`: ensaio com 3 celulares, validação do servidor, checklist do evento e relatório do piloto.
+
 ## Dados fictícios para testes (seed)
 
 Com a stack no ar (`docker compose up --build`), popule o banco com torneios de mentira:
