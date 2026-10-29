@@ -112,3 +112,47 @@ pre.json { background: var(--bg); padding: 0.75rem; border-radius: var(--r); ove
 @media (forced-colors: active) { .btn, .badge, .card, input, select, textarea, dialog { border: 2px solid CanvasText; } .btn.primary { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
 @media print { .sidenav, .topbar, .toasts, .btn { display: none !important; } body { background: #fff; color: #000; } }
 .win { font-weight: 700; color: var(--amber); }
+
+/* Placar de quadra (organizador e juiz) */
+.scoreboard { max-width: 960px; margin: 0 auto; padding: 1rem 16px 2rem; display: grid; gap: 1rem; }
+.sb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.sb-title { font: 700 1.6rem var(--f-head); margin: 0; }
+.sb-sets { font-size: 1.15rem; margin: 0; }
+.sb-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sb-side { background: var(--surf); border: 2px solid var(--hair); border-radius: var(--r); padding: 1rem; display: grid; gap: 0.75rem; justify-items: center; text-align: center; }
+.sb-side.win { border-color: var(--ok); }
+.sb-name { font: 700 1.2rem var(--f-head); margin: 0; overflow-wrap: anywhere; }
+.sb-score { font: 800 clamp(4rem, 22vw, 8rem) / 1 var(--f-num); margin: 0; }
+.sb-plus { width: 100%; min-height: 96px; font-size: 2.5rem; }
+.sb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sb-final { display: grid; gap: 0.75rem; }
+@media (max-width: 420px) { .sb-sides { grid-template-columns: 1fr; } }
+
+/* Telão */
+.tv { padding: 1.25rem 2vw; min-height: 100vh; display: grid; gap: 1rem; align-content: start; }
+.tv-head { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; justify-content: space-between; }
+.tv-head h1 { font: 700 clamp(1.6rem, 3vw, 2.6rem) var(--f-head); margin: 0; }
+.tv-head .num { font-size: clamp(1.6rem, 3vw, 2.6rem); }
+.tv-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.tv-court { background: var(--surf); border: 2px solid var(--hair); border-radius: var(--r); padding: 1rem 1.25rem; display: grid; gap: 0.75rem; align-content: start; }
+.tv-court h2 { font: 700 clamp(1.4rem, 2.4vw, 2.2rem) var(--f-head); margin: 0; }
+.tv-idle { font-size: 1.6rem; color: var(--tx2); margin: 0; }
+.tv-live { border: 2px solid var(--live); border-radius: var(--r); padding: 0.75rem 1rem; }
+.tv-line { display: flex; align-items: center; gap: 0.75rem; margin: 0.25rem 0; }
+.tv-name { flex: 1; font-size: clamp(1.2rem, 2.2vw, 2rem); font-weight: 700; overflow-wrap: anywhere; }
+.tv-pts { font: 800 clamp(2.4rem, 5vw, 4.5rem) var(--f-num); min-width: 2ch; text-align: right; }
+.tv-sets { font-size: clamp(1.1rem, 2vw, 1.8rem); color: var(--tx2); }
+.tv-next h3 { font-size: 1.1rem; margin: 0; color: var(--tx2); }
+.tv-next ol { margin: 0.25rem 0 0; padding-left: 1.25rem; font-size: clamp(1rem, 1.6vw, 1.4rem); }
+
+/* Súmulas */
+.sheet { border: 1px solid var(--hair); border-radius: var(--r); padding: 1rem; margin-bottom: 1rem; break-inside: avoid; }
+.sheet table { width: 100%; border-collapse: collapse; }
+.sheet th, .sheet td { border: 1px solid var(--line); padding: 0.4rem; text-align: left; }
+.sheet td.blank { height: 2.5rem; }
+.sheet .sign { margin-top: 1.5rem; }
+@media print {
+  .no-print { display: none !important; }
+  .sheet { border-color: #000; page-break-after: always; margin: 0; }
+  .sheet th, .sheet td { border-color: #000; }
+}

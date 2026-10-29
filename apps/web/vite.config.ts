@@ -22,14 +22,14 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/p\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/p\//, /^\/juiz\.html/],
         cleanupOutdatedCaches: true,
       },
     }),
   ],
   build: {
     target: 'es2022',
-    rollupOptions: { input: { main: 'index.html', public: 'public.html' } },
+    rollupOptions: { input: { main: 'index.html', public: 'public.html', juiz: 'juiz.html' } },
   },
   server: { proxy: { '/api': { target: process.env.API_URL ?? 'http://localhost:3000', changeOrigin: true } } },
 });

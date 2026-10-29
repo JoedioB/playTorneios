@@ -155,8 +155,11 @@ export type Slot =
 export type MatchLifecycle = 'not_started' | 'in_progress' | 'finished';
 
 export interface LiveScore {
+  /** Pontos do set em andamento (ou da partida, em ponto único). */
   a: number;
   b: number;
+  /** Sets já concluídos (só em partidas por sets). */
+  sets?: SetScore[];
   updatedAt: IsoDateTime;
 }
 
@@ -203,6 +206,8 @@ export interface ResultRevision {
   invalidatedBy?: 'bracket_change' | 'correction';
   recordedAt: IsoDateTime;
   deviceId: string;
+  /** Nome de quem lançou, quando foi um juiz por link. */
+  recordedBy?: string;
 }
 
 export interface TieResolution {

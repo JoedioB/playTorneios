@@ -13,3 +13,5 @@ export * from './apply.ts';
 export * from './csv.ts';
 export * from './public-snapshot.ts';
 export * from './reports.ts';
+export * from './scoreboard.ts';
+export * from './referee.ts';

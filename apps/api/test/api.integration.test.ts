@@ -314,5 +314,75 @@ if (!url) {
       const left = await pool.query(`select count(*)::int as n from entity_versions where starts_with(key, $1)`, [`${plan.tournamentId}/`]);
       assert.equal(left.rows[0].n, 0);
     });
+
+    test('juiz: link por quadra, escopo, privacidade, revogação e isolamento', async () => {
+      const a = await newAccount();
+      const b = await newAccount();
+      const plan = byId(plansFor(a.organizationId), 'seed-copa');
+      await pushAll(a.cookie, plan.operations);
+      const st = plan.finalState as { matches: Record<string, { id: string; courtId?: string; lifecycle: string }> };
+      const open = Object.values(st.matches).filter((m) => m.courtId && m.lifecycle !== 'finished');
+      const mine = open[0]!;
+      const other = open.find((m) => m.courtId !== mine.courtId);
+      const tid = plan.tournamentId;
+
+      // só o dono cria link; quadra inexistente é recusada
+      assert.equal((await call(`/api/tournaments/${tid}/referee-links`, { cookie: b.cookie, body: { courtId: mine.courtId } })).statusCode, 404);
+      assert.equal((await call(`/api/tournaments/${tid}/referee-links`, { cookie: a.cookie, body: { courtId: 'nao-existe' } })).statusCode, 400);
+      const made = await call(`/api/tournaments/${tid}/referee-links`, { cookie: a.cookie, body: { courtId: mine.courtId, label: 'Quadra do teste' } });
+      assert.equal(made.statusCode, 201, made.body);
+      const { token, link } = made.json() as { token: string; link: { id: string } };
+      const auth = { authorization: `Bearer ${token}` };
+      const hash = (await pool.query('select token_hash from referee_links where id = $1', [link.id])).rows[0].token_hash as string;
+      assert.notEqual(hash, token); // nunca em claro
+
+      // sem token, com token errado e com a sessão do organizador: nada de acesso ao caminho do juiz
+      assert.equal((await call('/api/referee/court', {})).statusCode, 401);
+      assert.equal((await call('/api/referee/court', { headers: { authorization: 'Bearer ' + 'x'.repeat(43) } })).statusCode, 401);
+      assert.equal((await call('/api/referee/court', { cookie: a.cookie })).statusCode, 401);
+
+      // visão mínima: só a quadra dele e nenhum dado pessoal
+      const view = await call('/api/referee/court', { headers: auth });
+      assert.equal(view.statusCode, 200, view.body);
+      const v = view.json() as { matches: Array<{ id: string; status: string; ready: boolean }>; court: { id: string } };
+      assert.equal(v.court.id, mine.courtId);
+      assert.ok(v.matches.length > 0, 'a quadra tem partidas na visão do juiz');
+      // a visão é limitada (próximas + encerradas recentes): toda partida exibida é da quadra do link
+      for (const m of v.matches) assert.equal(st.matches[m.id]?.courtId, mine.courtId, 'só partidas da quadra do link');
+      if (other) assert.ok(!v.matches.some((m) => m.id === other.id));
+      const target = v.matches.find((m) => m.status !== 'finished' && m.ready) ?? v.matches[0]!;
+      for (const needle of ['phone', 'birthDate', 'email', '(00)']) assert.ok(!view.body.includes(needle), needle);
+
+      // escrita: quadra dele passa; outra quadra e tipos fora da lista não
+      const start = await call('/api/referee/push', { headers: auth, body: { commands: [{ opId: randomUUID(), type: 'match.start', payload: { matchId: target.id } }] } });
+      assert.equal(start.statusCode, 200, start.body);
+      assert.equal(start.json().results.length, 1, start.body);
+      if (other) {
+        const bad = await call('/api/referee/push', { headers: auth, body: { commands: [{ opId: randomUUID(), type: 'match.start', payload: { matchId: other.id } }] } });
+        assert.equal(bad.json().results[0].error.code, 'FORBIDDEN_MATCH');
+      }
+      const wrongType = await call('/api/referee/push', { headers: auth, body: { commands: [{ opId: randomUUID(), type: 'tournament.save', payload: {} }] } });
+      assert.equal(wrongType.statusCode, 400);
+      // o juiz não alcança as rotas do organizador
+      assert.equal((await call('/api/tournaments', { headers: auth })).statusCode, 401);
+      assert.equal((await call('/api/sync/push', { headers: auth, body: { operations: [] } })).statusCode, 401);
+
+      // revogar encerra na hora; outra organização não revoga nem lista
+      assert.equal((await call(`/api/tournaments/${tid}/referee-links/${link.id}`, { cookie: b.cookie, method: 'DELETE' })).statusCode, 404);
+      assert.equal((await call(`/api/tournaments/${tid}/referee-links`, { cookie: b.cookie })).json().links.length, 0);
+      const listed = (await call(`/api/tournaments/${tid}/referee-links`, { cookie: a.cookie })).json().links as Array<{ id: string }>;
+      assert.ok(listed.some((l) => l.id === link.id), 'link listado');
+      assert.equal((await call(`/api/tournaments/${tid}/referee-links/${link.id}`, { cookie: a.cookie, method: 'DELETE' })).statusCode, 200);
+      assert.equal((await call('/api/referee/court', { headers: auth })).statusCode, 401);
+
+      // link vencido também é recusado
+      const made2 = await call(`/api/tournaments/${tid}/referee-links`, { cookie: a.cookie, body: { courtId: mine.courtId } });
+      await pool.query(`update referee_links set expires_at = now() - interval '1 minute' where id = $1`, [made2.json().link.id]);
+      assert.equal((await call('/api/referee/court', { headers: { authorization: `Bearer ${made2.json().token}` } })).statusCode, 401);
+
+      // LGPD: excluir o torneio apaga os links
+      assert.equal((await call(`/api/tournaments/${tid}`, { cookie: a.cookie, method: 'DELETE' })).statusCode, 200);
+      assert.equal((await pool.query('select count(*)::int as n from referee_links where tournament_id = $1', [tid])).rows[0].n, 0);
+    });
   });
 }

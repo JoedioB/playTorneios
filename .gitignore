@@ -153,3 +153,6 @@ playtorneios.tar.gz
 .smoke/
 logs_github_actions/
 logs_*.zip
+
+# macOS
+.DS_Store

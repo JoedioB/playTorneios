@@ -101,6 +101,7 @@ const resultPayload = z
     confirmToken: z.string().max(64).optional(),
     expectedA: id.optional(),
     expectedB: id.optional(),
+    by: text(60).optional(),
   })
   .strict();
 
@@ -122,7 +123,9 @@ export const payloadSchemas: Record<CommandType, z.ZodTypeAny> = {
   'match.schedule': z.object({ matchId: id, courtId: id.nullable(), scheduledAt: iso.nullable() }).strict(),
   'schedule.apply': z.object({ assignments: z.array(z.object({ matchId: id, courtId: id, scheduledAt: iso }).strict()).max(1000) }).strict(),
   'match.start': z.object({ matchId: id }).strict(),
-  'match.live_score': z.object({ matchId: id, a: z.number().int().min(0).max(99), b: z.number().int().min(0).max(99) }).strict(),
+  'match.live_score': z
+    .object({ matchId: id, a: z.number().int().min(0).max(99), b: z.number().int().min(0).max(99), sets: z.array(setScore).max(4).optional() })
+    .strict(),
   'bracket.swap': z
     .object({
       categoryId: id,
@@ -161,6 +164,22 @@ export const operationSchema = z
   });
 
 export const pushRequestSchema = z.object({ operations: z.array(operationSchema).min(1).max(100) }).strict();
+
+/** Juiz: só comandos de placar. O servidor monta a operação (aparelho, escopo, relógio); o cliente não escolhe nada disso. */
+export const REFEREE_COMMAND_TYPES = ['match.start', 'match.live_score', 'result.record'] as const;
+export const refereePushSchema = z
+  .object({
+    commands: z
+      .array(z.object({ opId: id, type: z.enum(REFEREE_COMMAND_TYPES), payload: z.unknown() }).strict())
+      .min(1)
+      .max(20),
+  })
+  .strict();
+export type RefereePushRequest = z.infer<typeof refereePushSchema>;
+
+export const refereeLinkCreateSchema = z
+  .object({ courtId: id, label: text(60).optional(), validDays: z.number().int().min(1).max(7).optional() })
+  .strict();
 
 export const loginSchema = z.object({ email: z.string().email().max(254), password: z.string().min(1).max(200) }).strict();
 

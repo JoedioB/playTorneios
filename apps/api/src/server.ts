@@ -13,10 +13,12 @@ const purgeSessions = () =>
   pool
     .query(`delete from sessions where expires_at < now() or last_seen_at < now() - ($1 || ' hours')::interval`, [String(config.SESSION_IDLE_HOURS ?? 8)])
     .catch((e) => console.error('purge de sessões falhou', e.message));
+const purgeRefereeLinks = () => pool.query(`delete from referee_links where expires_at < now() - interval '7 days' or revoked_at < now() - interval '7 days'`).catch((e) => console.error('purge de links de juiz falhou', e.message));
 const purgeLoginFailures = () => pool.query(`delete from login_failures where at < now() - interval '1 day'`).catch((e) => console.error('purge de tentativas falhou', e.message));
 void purgeSessions();
 void purgeLoginFailures();
-const purgeTimer = setInterval(() => { void purgeSessions(); void purgeLoginFailures(); }, 3_600_000);
+void purgeRefereeLinks();
+const purgeTimer = setInterval(() => { void purgeSessions(); void purgeLoginFailures(); void purgeRefereeLinks(); }, 3_600_000);
 purgeTimer.unref();
 
 // Retenção de dados pessoais: uma vez por dia (e na subida) anonimiza atletas de torneios encerrados há mais de RETENTION_MONTHS.

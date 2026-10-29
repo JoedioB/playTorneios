@@ -106,6 +106,34 @@ fs.mkdirSync(shots, { recursive: true });
   await page.screenshot({ path: shots + '/agenda.png', fullPage: true });
   log('agenda proposta e aplicada sem conflitos');
 
+  // Placar de quadra: iniciar, lançar pontos, desfazer, finalizar pela tela cheia
+  await page.goto(base + '/index.html#/');
+  await page.getByRole('button', { name: 'Iniciar', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Abrir placar' }).first().click();
+  await page.getByRole('button', { name: /^Ponto para / }).first().waitFor();
+  const plus = (i) => page.getByRole('button', { name: /^Ponto para / }).nth(i);
+  for (let i = 0; i < 3; i++) await plus(0).click();
+  await page.getByRole('button', { name: 'Desfazer último ponto' }).click();
+  await page.getByRole('button', { name: 'Desfazer último ponto' }).click();
+  await page.getByRole('button', { name: 'Desfazer último ponto' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Desfazer último ponto' }).isDisabled(), true);
+  for (let i = 0; i < 10; i++) await plus(1).click();
+  for (let i = 0; i < 18; i++) await plus(0).click();
+  await page.getByText(/Sets 1 × 0/).waitFor();
+  for (let i = 0; i < 12; i++) await plus(1).click();
+  for (let i = 0; i < 18; i++) await plus(0).click();
+  await page.getByRole('heading', { name: /venceu$/ }).waitFor();
+  assert.equal(await plus(0).isDisabled(), true, 'depois de decidida a partida, os botões de ponto travam');
+  await page.getByRole('button', { name: 'Finalizar partida' }).click();
+  await page.getByRole('button', { name: 'Confirmar placar' }).click();
+  await page.getByText('Resultado registrado.').first().waitFor();
+  log('placar de quadra: pontos, desfazer e finalização pelo próprio placar');
+  await page.goto(base + '/index.html#/telao');
+  await page.getByRole('heading', { name: 'Quadra 1' }).waitFor();
+  await page.goto(base + '/index.html#/imprimir');
+  await page.getByRole('article', { name: /^Súmula/ }).first().waitFor();
+  log('telão e súmulas para impressão abrem');
+
   // Resultados
   await page.goto(base + '/index.html#/resultados');
   const play = async (a1, b1, a2, b2) => {
@@ -125,7 +153,6 @@ fs.mkdirSync(shots, { recursive: true });
   await d.getByRole('alert').filter({ hasText: /diferença|terminar|Terminando/i }).waitFor();
   log('placar inválido é explicado em português');
   await d.getByRole('button', { name: 'Cancelar' }).click();
-  await play(18, 10, 18, 12);
   await play(10, 18, 12, 18);
   await page.getByRole('button', { name: /^Registrar placar de Final/ }).waitFor();
   await page.getByRole('button', { name: /^Registrar placar de Final/ }).click();
@@ -175,9 +202,11 @@ fs.mkdirSync(shots, { recursive: true });
   const pubText = await page.locator('.preview-light').innerText();
   assert.ok(/Atleta 1A/.test(pubText) && !/84999/.test(pubText));
   log('página pública publicada e pré-visualizada');
+  assert.ok(await page.getByRole('button', { name: 'Sair', exact: true }).first().isVisible(), 'o botão Sair deve estar visível no cabeçalho');
+  log('botão "Sair" visível no cabeçalho');
 
   // acessibilidade básica em todas as rotas
-  const routes = ['', 'agenda', 'chaves', 'resultados', 'inscricoes', 'duplas', 'categorias', 'quadras', 'torneio', 'publico', 'relatorios', 'encerramento', 'sync', 'sistema'];
+  const routes = ['', 'agenda', 'chaves', 'resultados', 'inscricoes', 'duplas', 'categorias', 'quadras', 'juizes', 'imprimir', 'torneio', 'publico', 'relatorios', 'encerramento', 'sync', 'sistema'];
   for (const r of routes) {
     await page.goto(`${base}/index.html#/${r}`);
     await page.waitForTimeout(150);
@@ -221,7 +250,7 @@ fs.mkdirSync(shots, { recursive: true });
   } else {
     const report = [];
     for (const contrast of ['dark', 'light']) {
-      for (const r of routes) {
+      for (const r of [...routes, 'telao']) {
         await page.goto(`${base}/index.html#/${r}`);
         await page.evaluate((c) => { const r = document.documentElement; r.dataset.contrast = c; if (c === 'light') { r.style.removeProperty('--amber'); r.style.removeProperty('--on-amber'); } }, contrast);
         await page.waitForTimeout(150);

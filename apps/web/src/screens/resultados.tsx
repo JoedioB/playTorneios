@@ -62,7 +62,7 @@ export function ResultadosScreen() {
                     <th scope="row">{m.label}</th>
                     <td>{a} <span className="muted">x</span> {b}</td>
                     <td className="num">{fmtDateTime(m.scheduledAt)}</td>
-                    <td><MatchStatus m={m} kind={rm?.result?.kind} /></td>
+                    <td><MatchStatus m={m} kind={rm?.result?.kind} />{rm?.result?.recordedBy && <div className="muted small">Lançado por {rm.result.recordedBy} (juiz)</div>}</td>
                     <td className="num">{rm?.result ? scoreText(rm.result.sets, rm.result.points) || (rm.result.kind === 'walkover' ? 'W.O.' : '') : ''}</td>
                     <td>
                       <div className="row">

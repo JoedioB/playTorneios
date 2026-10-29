@@ -252,6 +252,7 @@ function buildRevision(s: TournamentState, p: ResultPayload, ctx: ApplyContext):
     reason: reason || undefined,
     recordedAt: ctx.now,
     deviceId: ctx.deviceId,
+    recordedBy: p.by?.trim() || undefined,
   };
   return { revision, correction };
 }
@@ -574,10 +575,13 @@ export function apply(state: TournamentState, cmd: Command, ctx: ApplyContext): 
     case 'match.live_score': {
       const m = need(s.matches[cmd.payload.matchId], 'MATCH_NOT_FOUND', 'Partida não encontrada.');
       if (m.lifecycle === 'finished') fail('MATCH_FINISHED', 'A partida já terminou.');
-      const { a, b } = cmd.payload;
+      const { a, b, sets } = cmd.payload;
       if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) fail('SCORE_INVALID', 'O placar ao vivo precisa ter números inteiros não negativos.');
+      if (sets && (sets.length > 4 || sets.some((x) => !Number.isInteger(x.a) || !Number.isInteger(x.b) || x.a < 0 || x.b < 0))) {
+        fail('SCORE_INVALID', 'Os sets já concluídos precisam ter números inteiros não negativos (no máximo 4).');
+      }
       m.lifecycle = 'in_progress';
-      m.live = { a, b, updatedAt: ctx.now };
+      m.live = { a, b, ...(sets && sets.length > 0 ? { sets: sets.map((x) => ({ a: x.a, b: x.b })) } : {}), updatedAt: ctx.now };
       m.updatedAt = ctx.now;
       break;
     }
