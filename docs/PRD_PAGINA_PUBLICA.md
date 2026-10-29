@@ -144,7 +144,7 @@ Prefixo **RFP** (requisito da página pública). Todos os itens "Implementado" t
 
 ## 9. Dependências e integrações
 
-- Publicação e snapshot: `docs/SPEC_PAGINA_PUBLICA.md` §4 e §5; privacidade: DEC-12 e DEC-21.
+- Publicação e snapshot: `docs/SPEC_PAGINA_PUBLICA.md` §3 (quando o snapshot é gerado) e §4 (contrato de dados); privacidade: DEC-12 e DEC-21.
 - Placar ao vivo: vem do juiz por link (DEC-29) ou do organizador; a página mostra o que está no snapshot.
 - Identidade visual: tema derivado das cores do torneio (RF-18); cores semânticas (ao vivo, ok, aviso, erro) são fixas.
 - Hospedagem: mesma origem do painel (DEC-28, DEC-31); rota pública `/api/public/:slug` sem autenticação.
