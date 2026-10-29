@@ -135,7 +135,15 @@ export function ago(ms: number): string {
   return `há ${Math.floor(s / 3600)} h`;
 }
 
-export const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+/** Diferença (servidor − aparelho) em ms, a partir do cabeçalho `Date` da resposta. 0 se ausente/inválido ou absurdo (> 1 dia). */
+export function clockSkew(dateHeader: string | null | undefined, localNow: number): number {
+  const s = dateHeader ? Date.parse(dateHeader) : Number.NaN;
+  if (!Number.isFinite(s)) return 0;
+  const d = s - localNow;
+  return Math.abs(d) > 86_400_000 ? 0 : d;
+}
+
+export const plural =(n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 export function scoreText(m: PublicMatch): string {
   if (m.walkover) return 'W.O.';

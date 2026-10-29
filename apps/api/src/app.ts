@@ -328,7 +328,7 @@ export async function buildApp(deps: AppDeps) {
     const row = r.rows[0];
     if (!row) return reply.code(404).send({ error: { code: 'NOT_FOUND', message: 'Este torneio não está publicado.' } });
     if (req.headers['if-none-match'] === row.etag) return reply.code(304).send();
-    reply.header('etag', row.etag).header('cache-control', 'public, max-age=30, stale-while-revalidate=120');
+    reply.header('etag', row.etag).header('cache-control', 'no-cache'); // sempre revalida (ETag → 304 barato): placar nunca fica "congelado" em cache de navegador ou proxy
     return row.snapshot;
   });
 

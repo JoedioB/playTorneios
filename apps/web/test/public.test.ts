@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FOLLOW_KEY, MAX_FOLLOWED, ago, announceDiff, categoryStatus, dateRange, knockoutRounds, liveMatches, matchesOfPair, matchesQuery, norm, pairNames,
-  parseFollowed, scoreColumns, serializeFollowed, upcoming, hasContent, whenShort,
+  parseFollowed, clockSkew, scoreColumns, serializeFollowed, upcoming, hasContent, whenShort,
 } from '../src/public/logic.ts';
 import { P, makeSnapshot } from './public-fixture.ts';
 
@@ -110,4 +110,13 @@ test('textos: "há X", datas em Brasília, intervalo de datas', () => {
   assert.equal(dateRange('2026-11-07', '2026-11-08'), '7 a 8 de novembro de 2026');
   assert.equal(dateRange('2026-11-07', '2026-11-07'), '7 de novembro de 2026');
   assert.equal(dateRange('2026-10-30', '2026-11-02'), '30 de outubro de 2026 a 2 de novembro de 2026');
+});
+
+test('relógio do servidor: diferença pelo cabeçalho Date; ignora ausente, inválido e absurdo', () => {
+  const local = Date.parse('2026-11-07T15:00:00Z');
+  assert.equal(clockSkew('Sat, 07 Nov 2026 15:02:00 GMT', local), 120000, 'servidor 2 min à frente');
+  assert.equal(clockSkew('Sat, 07 Nov 2026 14:59:00 GMT', local), -60000);
+  assert.equal(clockSkew(null, local), 0);
+  assert.equal(clockSkew('lixo', local), 0);
+  assert.equal(clockSkew('Mon, 09 Nov 2026 15:00:00 GMT', local), 0, 'mais de 1 dia: descarta');
 });

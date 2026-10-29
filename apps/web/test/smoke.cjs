@@ -418,6 +418,16 @@ fs.mkdirSync(shots, { recursive: true });
     await nav.getByRole('link', { name: 'Mista Iniciante' }).click();
     await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
     assert.equal(new URL(pg.url()).hash, '#categoria-cat-b');
+    // "Todas": mostra todas as categorias em sequência e tem link próprio
+    await nav.getByRole('link', { name: 'Todas' }).click();
+    await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
+    await pg.getByRole('heading', { level: 2, name: /Masculina Open/ }).waitFor();
+    assert.equal(await nav.getByRole('link', { name: 'Todas' }).getAttribute('aria-current'), 'true');
+    assert.equal(new URL(pg.url()).hash, '#todas');
+    await c.close();
+    ({ c, pg } = await publicPage({ hash: '#todas' }));
+    await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
+    await pg.getByRole('heading', { level: 2, name: /Masculina Open/ }).waitFor();
     await c.close();
     ({ c, pg } = await publicPage({ hash: '#categoria-cat-b' }));
     await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
@@ -431,7 +441,7 @@ fs.mkdirSync(shots, { recursive: true });
     for (const w of [320, 375]) { // 8 categorias (com "ao vivo"): a faixa rola sozinha, a página não
       ({ c, pg } = await publicPage({ variant: 'many', vp: [w, 640] }));
       await pg.getByRole('navigation', { name: 'Categorias' }).waitFor();
-      assert.equal(await pg.getByRole('navigation', { name: 'Categorias' }).getByRole('link').count(), 8);
+      assert.equal(await pg.getByRole('navigation', { name: 'Categorias' }).getByRole('link').count(), 9, '8 categorias + "Todas"');
       assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, `8 categorias alargam a página em ${w}px`);
       assert.ok(await pg.evaluate(() => { const u = document.querySelector('.pv-catnav ul'); return u.scrollWidth > u.clientWidth; }), 'a faixa de categorias rola na horizontal');
       await c.close();

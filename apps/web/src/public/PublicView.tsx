@@ -21,11 +21,15 @@ function Icon({ name, fill }: { name: keyof typeof ICON; fill?: boolean }) {
   return <svg className={`icon${fill ? ' fill' : ''}`} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={ICON[name]} /></svg>;
 }
 
-export interface Conn { fetchedAt: number; failing: boolean }
+export interface Conn { fetchedAt: number; failing: boolean; skewMs?: number }
 type Theme = 'dark' | 'light';
 const enc = (id: string) => `categoria-${encodeURIComponent(id)}`;
+/** Seleção especial: mostra todas as categorias, uma depois da outra (link `#todas`). */
+const ALL = '*';
+const anchor = (sel: string) => (sel === ALL ? 'todas' : enc(sel));
 const hashCategory = (): string | null => {
   const h = location.hash;
+  if (h === '#todas') return ALL;
   if (!h.startsWith('#categoria-')) return null;
   try { return decodeURIComponent(h.slice('#categoria-'.length)); } catch { return null; }
 };
@@ -194,9 +198,11 @@ export function PublicView({ snapshot, embedded, conn }: { snapshot: PublicSnaps
   };
 
   // relógio para "hoje", "atualizado há"
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { if (embedded) return; const iv = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(iv); }, [embedded]);
-  useEffect(() => { setNow(Date.now()); }, [snapshot]);
+  // (hora do servidor: o relógio do aparelho pode estar errado; `skewMs` vem do cabeçalho Date)
+  const skew = conn?.skewMs ?? 0;
+  const [now, setNow] = useState(() => Date.now() + skew);
+  useEffect(() => { if (embedded) return; const iv = setInterval(() => setNow(Date.now() + skew), 10000); return () => clearInterval(iv); }, [embedded, skew]);
+  useEffect(() => { setNow(Date.now() + skew); }, [snapshot, skew]);
 
   // duplas seguidas (preferência local; nada sai do aparelho)
   const [followed, setFollowed] = useState<string[]>(() => {
@@ -230,20 +236,22 @@ export function PublicView({ snapshot, embedded, conn }: { snapshot: PublicSnaps
     return () => window.removeEventListener('hashchange', on);
   }, [embedded]);
   const defaultId = (cats.find((c) => categoryStatus(c) === 'live') ?? cats[0])?.id;
-  const activeId = cats.some((c) => c.id === selId) ? (selId as string) : defaultId;
+  const showAll = selId === ALL && cats.length > 1;
+  const activeId = showAll ? ALL : cats.some((c) => c.id === selId) ? (selId as string) : defaultId;
   const active = cats.find((c) => c.id === activeId);
   const navRef = useRef<HTMLUListElement>(null);
   const pick = (id: string) => {
     setSelId(id);
-    if (!embedded) history.replaceState(null, '', `#${enc(id)}`);
-    requestAnimationFrame(() => document.getElementById(`${idp}${enc(id)}`)?.scrollIntoView({ block: 'start' }));
+    if (!embedded) history.replaceState(null, '', `#${anchor(id)}`);
+    requestAnimationFrame(() => document.getElementById(id === ALL ? `${idp}cats` : `${idp}${enc(id)}`)?.scrollIntoView({ block: 'start' }));
   };
   const first = useRef(true);
   useEffect(() => {
     // link com #categoria-…: rola até a categoria assim que a página desenha (uma vez)
     if (embedded || !first.current) return;
     first.current = false;
-    if (hashCategory()) requestAnimationFrame(() => document.getElementById(`${idp}${location.hash.slice(1)}`)?.scrollIntoView({ block: 'start' }));
+    const h = hashCategory();
+    if (h) requestAnimationFrame(() => document.getElementById(h === ALL ? `${idp}cats` : `${idp}${location.hash.slice(1)}`)?.scrollIntoView({ block: 'start' }));
   }, [embedded, idp]);
   useEffect(() => {
     // centraliza o chip ativo só dentro da faixa (scrollIntoView também rolaria a página inteira)
@@ -293,7 +301,7 @@ export function PublicView({ snapshot, embedded, conn }: { snapshot: PublicSnaps
           </div>
           {!embedded && (
             <button type="button" className="pv-btn" onClick={toggleTheme}>
-              <Icon name={theme === 'light' ? 'moon' : 'sun'} />{theme === 'light' ? 'Tema escuro' : 'Modo sol'}
+              <Icon name={theme === 'light' ? 'moon' : 'sun'} /><span className="pv-btn-t">{theme === 'light' ? 'Tema escuro' : 'Modo sol'}</span>
             </button>
           )}
         </div>
@@ -361,10 +369,13 @@ export function PublicView({ snapshot, embedded, conn }: { snapshot: PublicSnaps
                 {cats.length > 0 && <ul className="pv-pairs">{cats.map((c) => <li key={c.id}>{c.name}</li>)}</ul>}
               </section>
             ) : (
-              <section className="pv-sec" aria-label="Jogos por categoria">
+              <section className="pv-sec pv-cats" id={`${idp}cats`} aria-label="Jogos por categoria">
                 {cats.length > 1 && (
                   <nav className="pv-catnav" aria-label="Categorias">
                     <ul ref={navRef} data-scroll>
+                      <li>
+                        <a href={`#${anchor(ALL)}`} aria-current={showAll ? 'true' : undefined} onClick={(e) => { e.preventDefault(); pick(ALL); }}>Todas</a>
+                      </li>
                       {cats.map((c) => {
                         const on = c.id === activeId, lv = categoryStatus(c) === 'live';
                         return (
@@ -378,7 +389,9 @@ export function PublicView({ snapshot, embedded, conn }: { snapshot: PublicSnaps
                     </ul>
                   </nav>
                 )}
-                {active && <CategoryView key={active.id} c={active} followed={followed} now={now} o={o} idp={idp} />}
+                {showAll
+                  ? cats.map((c) => <CategoryView key={c.id} c={c} followed={followed} now={now} o={o} idp={idp} />)
+                  : active && <CategoryView key={active.id} c={active} followed={followed} now={now} o={o} idp={idp} />}
               </section>
             )}
           </>

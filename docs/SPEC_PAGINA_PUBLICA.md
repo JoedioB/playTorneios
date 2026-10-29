@@ -1,6 +1,6 @@
 # Especificação — Página pública do torneio
 
-Versão 1.0 · 29/10/2026 · Status: **implementada (Fase 1)**. Requisitos de produto em `docs/PRD_PAGINA_PUBLICA.md` (IDs RFP/RNP). Privacidade: DEC-12 e DEC-21. Design: DEC-22 (Arena Noturna).
+Versão 1.1 · 29/10/2026 · Status: **Fase 1 implementada; Fase 2 parcial** (ver §13). Requisitos de produto em `docs/PRD_PAGINA_PUBLICA.md` (IDs RFP/RNP). Privacidade: DEC-12 e DEC-21. Design: DEC-22 (Arena Noturna).
 
 ## 1. Visão geral e arquitetura
 
@@ -30,10 +30,11 @@ Organizador (painel, offline-first) ──push──▶ API ──▶ tournament
 |---|---|---|
 | `/p/<slug>` | nginx (`locations.inc.template`, `try_files /public.html`) | HTML da página; `Cache-Control: no-cache`; CSP restritiva |
 | `/p/<slug>#categoria-<id>` | cliente | Abre e rola até a categoria; `<id>` é a `encodeURIComponent` do id |
+| `/p/<slug>#todas` | cliente | Mostra todas as categorias em sequência |
 | `GET /api/public/:slug` | API (sem autenticação) | 200 com o snapshot, 304 com `If-None-Match`, 404 se não publicado |
 | `/assets/*` | nginx | Arquivos com hash, `immutable` |
 
-Cabeçalhos da API pública: `ETag` (SHA-1 do JSON sem `generatedAt`) e `Cache-Control: public, max-age=30, stale-while-revalidate=120`. O cliente pede com `cache: 'no-cache'`, o que obriga a revalidar com o servidor a cada consulta (304 quando nada mudou), contornando o `max-age`. Ajustar o servidor para um valor menor é item da Fase 2.
+Cabeçalhos da API pública: `ETag` (SHA-1 do JSON sem `generatedAt`) e `Cache-Control: no-cache` (o cache pode guardar a resposta, mas **sempre revalida** com o servidor; sem mudança, a resposta é 304 e barata). O cliente também pede com `cache: 'no-cache'`. O cabeçalho `Date` da resposta dá a hora do servidor (§5, item 5).
 
 Despublicar apaga a linha de `public_snapshots` (o link vira 404 na hora). O slug é estável por torneio (`tournament_slugs`).
 
@@ -96,11 +97,12 @@ Teste de privacidade (obrigatório em todo commit): varre o snapshot e falha se 
 2. Define o tema inicial: `localStorage['pt:contrast']` (`light`/`dark`) se existir; senão `prefers-color-scheme`.
 3. Estados: `loading` (esqueleto com `aria-busy`), `ok`, `missing` (404), `error` (sem dados ainda).
 4. Consulta `GET /api/public/<slug>` com `cache: 'no-cache'`, `accept: application/json` e timeout de 12 s.
-5. Agendamento: **15 s** após cada consulta; **dobra a cada falha** (15 → 30 → 60 s, teto 60 s); só dispara se `document.visibilityState === 'visible'` (senão reagenda).
-6. Reconsulta imediata (se a última tem mais de 5 s) ao voltar para a aba e no evento `online`.
-7. Se `generatedAt` do novo snapshot for igual ao atual, **não troca o estado** (nada é redesenhado, a rolagem não pula).
-8. Falha: mantém o último snapshot; marca `failing` após 2 falhas seguidas ou com `navigator.onLine === false`. Sem snapshot nenhum, mostra "Sem conexão" com **Tentar agora**.
-9. 404: "Torneio não encontrado". Outros erros HTTP contam como falha.
+5. Hora do servidor: a cada resposta, `skew = Date(servidor) − Date.now()` (`clockSkew`; ignora cabeçalho ausente, inválido ou com diferença > 1 dia). A tela usa `Date.now() + skew` para “hoje”, “atualizado há” e “conferido há”.
+6. Agendamento: **15 s** após cada consulta; **dobra a cada falha** (15 → 30 → 60 s, teto 60 s); só dispara se `document.visibilityState === 'visible'` (senão reagenda).
+7. Reconsulta imediata (se a última tem mais de 5 s) ao voltar para a aba e no evento `online`.
+8. Se `generatedAt` do novo snapshot for igual ao atual, **não troca o estado** (nada é redesenhado, a rolagem não pula).
+9. Falha: mantém o último snapshot; marca `failing` após 2 falhas seguidas ou com `navigator.onLine === false`. Sem snapshot nenhum, mostra "Sem conexão" com **Tentar agora**.
+10. 404: "Torneio não encontrado". Outros erros HTTP contam como falha.
 
 ## 6. Estrutura da tela (`PublicView`)
 
@@ -118,9 +120,9 @@ Ordem vertical (cada bloco só aparece quando há conteúdo):
 | 8 | Próximos jogos | `section` + `h2` | 6 primeiros; "Mostrar todos (N)" |
 | 9 | Campeões | `section` + `h2` | 1º lugar de cada categoria com pódio |
 | 10 | Em breve | `section` | Quando ainda não há jogos, chaves, grupos, pódio nem duplas publicados |
-| 11 | Jogos por categoria | `nav` + `section` | Seletor fixo e categoria ativa |
+| 11 | Jogos por categoria | `nav` + `section` | Seletor fixo (**Todas** + categorias) e categoria ativa, ou todas em sequência |
 
-Categoria ativa: a do hash `#categoria-<id>` se válida; senão a primeira com jogo ao vivo; senão a primeira. Com uma só categoria, o seletor não aparece. Dentro da categoria (`CategoryView`): título e selo de estado, pódio, mata-mata por fase (`knockoutRounds`), classificação por grupo (tabela), "Jogos da fase de grupos" (`details`, aberto se há jogo ao vivo no grupo), "Duplas inscritas" (`details`), ou "A chave desta categoria ainda não foi publicada. Esta página atualiza sozinha."
+Categoria ativa: a do hash `#categoria-<id>` se válida; senão a primeira com jogo ao vivo; senão a primeira. `#todas` (chip **Todas**, primeiro da faixa) mostra todas as categorias, uma após a outra, separadas por filete. Com uma só categoria, o seletor não aparece. Dentro da categoria (`CategoryView`): título e selo de estado, pódio, mata-mata por fase (`knockoutRounds`), classificação por grupo (tabela), "Jogos da fase de grupos" (`details`, aberto se há jogo ao vivo no grupo), "Duplas inscritas" (`details`), ou "A chave desta categoria ainda não foi publicada. Esta página atualiza sozinha."
 
 Estado da categoria (`categoryStatus`, com texto): `empty` "Chave ainda não publicada", `waiting` "Aguardando início", `live` "Tem jogo ao vivo", `running` "Em andamento", `done` "Encerrada".
 
@@ -159,6 +161,7 @@ Armazenamento local (todo acesso com `try/catch`; a página funciona sem ele):
 - Sistema visual do painel (Arena Noturna): fundo escuro por padrão, cartões em superfície mais clara, destaque âmbar; **ao vivo = coral** (cor semântica fixa). O tema do torneio troca só o destaque (`accentOnDark` / `accentOnLight`, já corrigidos para contraste).
 - Dois conjuntos de tokens: escuro e claro. O **claro é o modo sol** (alto contraste). Não há terceiro tema.
 - Tipografia: fonte do sistema; algarismos tabulares nos placares (`.num`); nome do torneio em caixa normal; set atual do ao vivo em corpo maior (1,4 rem; 1,9 rem no destaque).
+- Cabeçalho enxuto até 380 px (23,75 rem): título 1,4 rem, espaçamentos menores e botão de tema só com ícone (texto mantido para leitor de tela; alvo de 44 px).
 - Layout: contêiner de até 72 rem, centralizado; padding 1 rem (1,5 rem a partir de 48 rem). Grades de cartões `repeat(auto-fill, minmax(min(100%, 19rem), 1fr))`; tabelas de classificação em grade de 22 rem; duplas inscritas em 2 colunas (≥ 48 rem) e 3 (≥ 72 rem). Seletor de categorias é uma faixa horizontal fixa (`sticky`) rolável.
 - Contraste medido (WCAG), escuro / claro: texto 17,7 / 19,3; texto secundário 7,9 / 8,5; "ao vivo" 6,3 / 6,0; placar sobre fundo ao vivo 6,8 / 6,5; ✓ do vencedor 10,8 / 6,0; borda de campo 4,4 / 5,9. Bordas decorativas de cartão (1,3–1,5) não carregam informação.
 - Movimento: o ponto pulsante e o esqueleto só animam com `prefers-reduced-motion: no-preference`. Modo de cores forçadas (`forced-colors`) usa bordas de `CanvasText`.
@@ -181,7 +184,7 @@ Armazenamento local (todo acesso com `try/catch`; a página funciona sem ele):
 | Bundle da página (gzip) | ≤ 80 kB | ~73 kB (JS 67,9 + CSS 5,5) |
 | Primeira dobra (375×667) | ao vivo visível sem rolar | 449 px do topo |
 | Altura da página de exemplo (375 px) | — | 4.598 px (antes: 12.027) |
-| Rede | 304 barato; sem repintar sem mudança | implementado |
+| Rede | 304 barato; sem repintar sem mudança | implementado (servidor com `no-cache` + ETag) |
 | Peso do snapshot | pequeno (centenas de partidas) | JSON único sem imagens além do logotipo (`logoDataUrl`, opcional) |
 
 O logotipo vai embutido no snapshot (`data:`); logotipos grandes aumentam cada resposta, então a tela de identidade deve limitar o tamanho.
@@ -198,7 +201,7 @@ O logotipo vai embutido no snapshot (`data:`); logotipos grandes aumentam cada r
 
 | Camada | Arquivo | Cobre |
 |---|---|---|
-| Unitário (10) | `apps/web/test/public.test.ts` (+ `public-fixture.ts`) | busca, nomes, ao vivo e próximos, jogos da dupla, mata-mata, estado da categoria, colunas do placar, anúncio, seguir, textos |
+| Unitário (11) | `apps/web/test/public.test.ts` (+ `public-fixture.ts`) | busca, nomes, ao vivo e próximos, jogos da dupla, mata-mata, estado da categoria, colunas do placar, anúncio, seguir, textos |
 | Domínio | `packages/domain/test/misc.test.ts` e testes de privacidade | `live.sets` com chaves exatas; nenhum campo pessoal |
 | Arquitetura | `test/architecture.test.ts` | uso de `localStorage` só com chaves permitidas (`pt:fav` incluída) |
 | Navegador | `apps/web/test/smoke.cjs` (página real servida em `/p/copa-teste`) | ver tabela abaixo |
@@ -209,7 +212,7 @@ O logotipo vai embutido no snapshot (`data:`); logotipos grandes aumentam cada r
 | 02, 03, 04, 07, 17 | primeira dobra (ao vivo em 375×667), ordem das seções, landmarks, metadados, sem rolagem horizontal em 320/375 e com 8 categorias, alvos ≥ 44 px, sem script inline |
 | 11 | tema segue o aparelho, Modo sol troca e é lembrado |
 | 05, 06 | busca, seguir, "Meus jogos" no topo, lembra ao recarregar, funciona sem `localStorage` |
-| 08 | seletor, `#categoria-<id>`, sem seletor com 1 categoria |
+| 08 | seletor, `#categoria-<id>`, **Todas** e `#todas`, sem seletor com 1 categoria (8 categorias = 9 chips) |
 | 12 | vazio, encerrado, sem agenda, 404, erro inicial com "Tentar agora", carregando |
 | 09, 10, 14 | consulta ~15 s com revalidação, sem remontar nem pular a tela, anúncio só dos jogos seguidos, aviso de sem conexão e recuperação |
 | 04 (RNP) | `prefers-reduced-motion` |
@@ -220,9 +223,9 @@ Lacunas conhecidas: sem teste com leitor de tela real, sem celular real ao sol, 
 
 | Melhoria | Mudança necessária |
 |---|---|
-| `Cache-Control` menor | `apps/api/src/app.ts` (`/api/public/:slug`): `no-cache` com ETag ou `max-age` curto |
+| ~~`Cache-Control` menor~~ | **Feito** (`no-cache` + ETag) |
+| ~~“há X” sem depender do relógio do aparelho~~ | **Feito** pelo cabeçalho `Date` (sem alterar o snapshot, para não quebrar o ETag) |
 | Árvore da chave | snapshot ganha `round`, `indexInRound` e origem do vencedor; atualizar allowlist e teste de privacidade |
-| "há X" sem depender do relógio do aparelho | snapshot ganha `serverNow` (ou cabeçalho `Date`) |
 | Prévia de link por torneio | HTML gerado no servidor (ou rota no nginx) com título e imagem do torneio |
 | Offline | service worker para `/p/` (hoje o PWA exclui `/p/` do fallback de navegação) |
 | Carga por ponto do juiz | compactar ou limitar a regeneração do snapshot em jogos ao vivo |
@@ -236,3 +239,4 @@ Lacunas conhecidas: sem teste com leitor de tela real, sem celular real ao sol, 
 | 29/10/2026 | Fonte do sistema, sem fontes extras |
 | 29/10/2026 | Seguir dupla guardado só no aparelho, até 6 por torneio |
 | 29/10/2026 | `live.sets` incluído no snapshot (apenas números) |
+| 29/10/2026 | Fase 2: `Cache-Control: no-cache`, hora do servidor pelo `Date`, cabeçalho enxuto ≤ 380 px, chip **Todas** |

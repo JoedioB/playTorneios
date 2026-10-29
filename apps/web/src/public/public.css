@@ -108,6 +108,18 @@
 
 @media (min-width: 48rem) { .pv { padding: 0 1.5rem 3rem; } .pv-catnav { margin: 0 -1.5rem 0.75rem; padding: 0.4rem 1.5rem; } }
 @media (max-width: 20rem) { .pv-pair-head { flex-wrap: wrap; } }
+/* Celular estreito (≤ 380 px): cabeçalho mais enxuto para o ao vivo subir na primeira dobra. */
+.pv-cat + .pv-cat { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--hair); }
+@media (max-width: 23.75rem) {
+  .pv-header { padding-top: 0.4rem; }
+  .pv h1 { font-size: 1.4rem; margin: 0.1rem 0 0.2rem; }
+  .pv-where { font-size: 0.875rem; margin-bottom: 0.25rem; }
+  .pv-fresh { margin-top: 0.1rem; }
+  .pv-find { margin-top: 0.5rem; }
+  .pv-sec { margin-top: 1.1rem; }
+  .pv-btn-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* só o ícone; o texto continua para leitor de tela */
+  .pv-top .pv-btn { position: relative; min-width: 44px; padding: 0; }
+}
 @media (forced-colors: active) { .pv-m, .pv-badge, .pv-btn, .pv-catnav a { border: 2px solid CanvasText; } .pv-catnav a[aria-current='true'] { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
 
 /* Carregamento: esqueleto estático (sem animação com "reduzir movimento"). */

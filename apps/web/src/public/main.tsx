@@ -4,6 +4,7 @@ import type { PublicSnapshot } from '@playtorneios/domain';
 import '../ui/styles.css';
 import { PublicView } from './PublicView.tsx';
 import type { Conn } from './PublicView.tsx';
+import { clockSkew } from './logic.ts';
 
 // Tema: preferência salva > tema do aparelho. (Antes: sempre claro.) O botão "Modo sol / Tema escuro" troca e salva.
 function startTheme(): 'dark' | 'light' {
@@ -28,11 +29,11 @@ function PublicApp() {
   const slug = location.pathname.split('/').filter(Boolean)[1] ?? '';
   const [snap, setSnap] = useState<PublicSnapshot | null>(null);
   const [state, setState] = useState<'loading' | 'ok' | 'missing' | 'error'>('loading');
-  const [conn, setConn] = useState<Conn>({ fetchedAt: Date.now(), failing: false });
+  const [conn, setConn] = useState<Conn>({ fetchedAt: Date.now(), skewMs: 0, failing: false });
   const loadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    let alive = true, fails = 0, timer: ReturnType<typeof setTimeout> | undefined, ctl: AbortController | undefined, last = 0;
+    let alive = true, fails = 0, skew = 0, timer: ReturnType<typeof setTimeout> | undefined, ctl: AbortController | undefined, last = 0;
     const schedule = () => {
       clearTimeout(timer);
       timer = setTimeout(() => { if (document.visibilityState === 'visible') void load(); else schedule(); }, Math.min(POLL_MS * 2 ** Math.min(fails, 2), 60000));
@@ -50,7 +51,9 @@ function PublicApp() {
         const j = (await r.json()) as PublicSnapshot;
         if (!alive) return;
         fails = 0;
-        setConn({ fetchedAt: Date.now(), failing: false });
+        // Relógio do servidor (cabeçalho Date): "há X" e "hoje" não dependem de o relógio do aparelho estar certo.
+        skew = clockSkew(r.headers.get('date'), Date.now());
+        setConn({ fetchedAt: Date.now() + skew, skewMs: skew, failing: false });
         setSnap((p) => (p && p.generatedAt === j.generatedAt ? p : j)); // igual ao anterior: não redesenha nada
         setState('ok');
       } catch {

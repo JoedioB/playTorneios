@@ -1,6 +1,6 @@
 # PRD — Página pública do torneio
 
-Versão 1.0 · 29/10/2026 · Status: **implementada (Fase 1)**; Fase 2 em backlog.
+Versão 1.1 · 29/10/2026 · Status: **Fase 1 implementada; Fase 2 parcial** (cache, hora do servidor, cabeçalho enxuto e “Todas as categorias” feitos; offline, árvore da chave e prévia por torneio em backlog).
 Complementa o `docs/PRD.md` (RF-16, RF-18, RF-21) e é detalhado tecnicamente em `docs/SPEC_PAGINA_PUBLICA.md`.
 
 ## 1. Resumo
@@ -60,7 +60,7 @@ Fora de métricas: não há conta, analytics de terceiros nem rastreamento do vi
 - Busca de dupla por nome ou sobrenome (sem acento, qualquer ordem).
 - **Seguir** duplas (até 6 por torneio), guardado só no aparelho; "Meus jogos" no topo.
 - **Ao vivo agora**, **Próximos jogos** (com "Mostrar todos"), **Campeões**.
-- Seção por categoria, com seletor fixo: selo de estado, pódio, mata-mata por fase, classificação de grupos, jogos da fase de grupos e duplas inscritas (recolhíveis).
+- Seção por categoria, com seletor fixo (inclui **Todas**, que lista as categorias em sequência): selo de estado, pódio, mata-mata por fase, classificação de grupos, jogos da fase de grupos e duplas inscritas (recolhíveis).
 - Cartão de partida: fase, estado (ao vivo, aguardando, encerrado, W.O., abandono), hora, quadra, categoria, placar por sets e vencedor.
 - Atualização automática a cada 15 s, aviso de conexão, anúncio discreto para leitor de tela.
 - Tema escuro ou claro pelo aparelho e botão **Modo sol**.
@@ -83,11 +83,9 @@ Fora de métricas: não há conta, analytics de terceiros nem rastreamento do vi
 | Uso offline da página (cache do último snapshot) | Reabrir sem rede | Service worker para `/p/` |
 | Árvore visual da chave | Entender caminhos até a final | Snapshot com rodada e origem do vencedor |
 | Prévia do link por torneio (nome, imagem) no WhatsApp | Mais cliques ao compartilhar | HTML gerado no servidor por torneio |
-| Cabeçalho mais enxuto em 320 px | Mostrar o ao vivo inteiro na primeira dobra | Ajuste de layout |
-| Cor primária do torneio na página | Identidade visual | Garantia de contraste |
-| `Cache-Control` mais curto na API | Menos defasagem para outros clientes | Ajuste no servidor |
-| Hora do servidor no snapshot (`serverNow`) | "há X" independente do relógio do aparelho | Snapshot |
-| Opção "Todas as categorias" | Visão corrida | Layout |
+| Cor primária do torneio na página | Identidade visual | Garantia de contraste; decisão do organizador (§13) |
+
+Feito na Fase 2 (29/10/2026): `Cache-Control: no-cache` na API pública (sempre revalida por ETag); hora do servidor pelo cabeçalho `Date` (sem mudar o snapshot); cabeçalho enxuto até 380 px (botão de tema só com ícone); opção **Todas** no seletor de categorias.
 
 ## 6. Requisitos funcionais
 
@@ -117,6 +115,8 @@ Prefixo **RFP** (requisito da página pública). Todos os itens "Implementado" t
 | RFP-20 | Uso offline: reabrir a página sem rede mostrando o último estado | Poderia | Fase 2 |
 | RFP-21 | Árvore visual da chave | Poderia | Fase 2 |
 | RFP-22 | Prévia de link por torneio | Poderia | Fase 2 |
+| RFP-23 | O seletor de categorias oferece **Todas**, com link `#todas` | Deveria | Implementado |
+| RFP-24 | “Há X” e “hoje” usam a hora do servidor, não a do aparelho | Deveria | Implementado |
 
 ## 7. Requisitos não funcionais
 
@@ -153,7 +153,7 @@ Prefixo **RFP** (requisito da página pública). Todos os itens "Implementado" t
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Placar público atrasado por cache | Visitante vê jogo "parado" | Cliente usa `no-cache`; ajustar `Cache-Control` do servidor (Fase 2) |
+| Placar público atrasado por cache | Visitante vê jogo "parado" | Cliente e servidor usam `no-cache` (revalida por ETag a cada consulta) |
 | Cada ponto do juiz regenera o snapshot | Carga no banco com muitas quadras | Medir no ensaio; compactar ou limitar a frequência se pesar |
 | Rede ruim no local | Página sem dados | Mantém último estado + aviso; offline completo na Fase 2 |
 | Nome de exibição da dupla muda | Favorito deixa de casar | Página avisa e permite remover o favorito |
