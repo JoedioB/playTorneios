@@ -3,11 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0A0E14" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+    <meta name="description" content="Jogos, placares ao vivo, chaves e classificação do torneio. Atualiza sozinha." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="playTorneios" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="Torneio — playTorneios" />
+    <meta property="og:description" content="Jogos, placares ao vivo, chaves e classificação do torneio." />
     <title>Torneio — playTorneios</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>Esta página precisa de JavaScript para mostrar os jogos do torneio.</noscript>
     <script type="module" src="/src/public/main.tsx"></script>
   </body>
 </html>

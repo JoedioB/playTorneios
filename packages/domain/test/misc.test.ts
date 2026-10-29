@@ -82,6 +82,20 @@ test('snapshot público: lista de permissão e nada de dados pessoais', () => {
   assert.ok(snap.includes('Atleta 1A'));
 });
 
+test('snapshot público: placar ao vivo inclui os sets já fechados (só números), sem novos campos', () => {
+  let s = setup({ pairs: 4 });
+  s = run(s, { type: 'tournament.save', payload: { tournament: { id: 't1', publish: { ...s.tournament!.publish, published: true } } } });
+  s = run(s, { type: 'bracket.generate', payload: { categoryId: 'c1', seed: 1 } });
+  const m = Object.values(s.matches).find((x) => x.round === 1)!;
+  s = run(s, { type: 'match.start', payload: { matchId: m.id } });
+  s = run(s, { type: 'match.live_score', payload: { matchId: m.id, a: 4, b: 2, sets: [{ a: 18, b: 16 }] } });
+  const pm = buildPublicSnapshot(s, 'x')!.categories[0]!.matches!.find((x) => x.id === m.id)!;
+  assert.deepEqual(pm.live, { a: 4, b: 2, sets: [{ a: 18, b: 16 }] });
+  assert.deepEqual(Object.keys(pm.live!).sort(), ['a', 'b', 'sets']);
+  s = run(s, { type: 'match.live_score', payload: { matchId: m.id, a: 3, b: 1 } });
+  assert.deepEqual(buildPublicSnapshot(s, 'x')!.categories[0]!.matches!.find((x) => x.id === m.id)!.live, { a: 3, b: 1 }, 'sem sets fechados, o formato antigo continua igual');
+});
+
 test('CSV: separador, BOM e proteção contra fórmulas', () => {
   const csv = toCsv(['A', 'B'], [['=cmd()', 'x;y'], ['ok', 'dizem "oi"']]);
   assert.ok(csv.startsWith('﻿'));

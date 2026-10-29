@@ -15,7 +15,8 @@ fs.mkdirSync(shots, { recursive: true });
     const root = path.join(__dirname, '..', '..', '..', '.smoke');
     const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
     server = http.createServer((req, res) => {
-      const file = path.join(root, decodeURIComponent((req.url || '/').split('?')[0]));
+      const url = decodeURIComponent((req.url || '/').split('?')[0]);
+      const file = path.join(root, url.startsWith('/p/') ? 'public.html' : url); // /p/<slug> = página pública (nginx faz o mesmo)
       if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' });
       fs.createReadStream(file).pipe(res);
@@ -298,6 +299,215 @@ fs.mkdirSync(shots, { recursive: true });
     const blocking = report.filter((v) => v.impacto === 'serious' || v.impacto === 'critical');
     assert.deepEqual(blocking, [], 'axe: violações sérias/críticas (relatório completo em axe-report.json):\n' + JSON.stringify(blocking, null, 2));
     log(`axe-core: nenhuma violação séria ou crítica em ${routes.length} rotas × 2 temas (${report.length} menores, ver axe-report.json)`);
+  }
+
+  // ------------------------------------------------------------------ página pública (/p/<slug>), com a API simulada
+  {
+    const { makeSnapshot, P } = await import('./public-fixture.ts');
+    const publicPage = async (opts = {}) => {
+      const { variant = 'full', vp = [375, 667], scheme = 'light', clock = false, init, status = 200, delay = 0, hash = '' } = opts;
+      const c = await browser.newContext({ viewport: { width: vp[0], height: vp[1] }, colorScheme: scheme, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: opts.reducedMotion || 'no-preference' });
+      const pg = await c.newPage();
+      const st = { hits: [], mode: 'ok', snap: makeSnapshot(Date.now(), variant), status };
+      const perrs = [];
+      pg.on('pageerror', (e) => perrs.push(e.message));
+      const origins = new Set();
+      pg.on('request', (r) => origins.add(new URL(r.url()).origin));
+      if (init) await pg.addInitScript(init);
+      if (clock) await pg.clock.install({ time: Date.now() });
+      await pg.route('**/api/public/**', async (r) => {
+        st.hits.push(r.request().headers());
+        if (delay) await new Promise((res) => setTimeout(res, delay));
+        if (st.mode === 'down') return r.abort('failed');
+        if (st.status !== 200) return r.fulfill({ status: st.status, contentType: 'application/json', body: '{"error":{"code":"X","message":"x"}}' });
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(st.snap) });
+      });
+      await pg.goto(`${base}/p/copa-teste${hash}`);
+      return { c, pg, st, perrs, origins };
+    };
+    const topics = (pg) => pg.locator('main h2').allInnerTexts();
+
+    // 1) primeira dobra, ordem, landmarks, metas, sem rolagem horizontal
+    let { c, pg, perrs, origins } = await publicPage();
+    await pg.getByRole('heading', { level: 1, name: 'Copa Teste de Futevôlei' }).waitFor();
+    assert.equal(await pg.locator('h1').count(), 1);
+    assert.equal(await pg.locator('main').count(), 1);
+    assert.equal(await pg.getByRole('search').count(), 1, 'busca em landmark search');
+    assert.equal(await pg.title(), 'Copa Teste de Futevôlei — Natal');
+    assert.ok(await pg.locator('meta[name=description]').count() && await pg.locator('meta[name=theme-color]').count(), 'meta description e theme-color');
+    const live = await pg.locator('.pv-m.live').first().boundingBox();
+    assert.ok(live && live.y + live.height <= 667, `jogo ao vivo precisa caber na primeira dobra de 375×667 (fim em ${live && Math.round(live.y + live.height)} px)`);
+    await pg.getByLabel('Encontrar minha dupla').waitFor();
+    const order = (await topics(pg)).map((t) => t.trim());
+    const idx = (t) => order.findIndex((x) => x.includes(t));
+    assert.ok(idx('Ao vivo agora') >= 0 && idx('Ao vivo agora') < idx('Próximos jogos') && idx('Próximos jogos') < idx('Masculina Open'), 'ordem: ao vivo → próximos → categoria; veio: ' + order.join(' | '));
+    for (const w of [375, 320]) {
+      await pg.setViewportSize({ width: w, height: 640 });
+      assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, `página pública rola na horizontal em ${w}px`);
+    }
+    await pg.setViewportSize({ width: 375, height: 667 });
+    const a11y = await pg.evaluate(() => {
+      const bad = [];
+      const nm = (el) => el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || (el.labels && el.labels.length) || el.textContent.trim();
+      for (const el of document.querySelectorAll('input, select, button, a[href]')) if (!nm(el)) bad.push('sem nome: ' + el.outerHTML.slice(0, 70));
+      for (const t of document.querySelectorAll('table')) if (!t.querySelector('caption') || !t.querySelector('th[scope=col]')) bad.push('tabela sem caption/th');
+      if (!document.querySelector('[role=status][aria-live=polite]')) bad.push('sem região viva');
+      for (const el of document.querySelectorAll('.pv-btn, .pv-catnav a, input, summary')) { const h = el.getBoundingClientRect().height; if (h && h < 43.5) bad.push('alvo < 44px: ' + el.className + ' ' + Math.round(h)); }
+      if (document.querySelector('script:not([src])')) bad.push('script inline (CSP)');
+      return bad;
+    });
+    assert.deepEqual(a11y, [], a11y.join(' | '));
+    assert.deepEqual([...origins], [new URL(base).origin], 'a página pública só fala com a própria origem (CSP, sem terceiros)');
+    assert.deepEqual(perrs, []);
+    await c.close();
+    log('página pública: ao vivo na primeira dobra (375×667), ordem das seções, landmarks, metas, 320/375 sem rolagem horizontal, alvos ≥ 44 px, só a própria origem');
+
+    // 2) tema: segue o aparelho; botão troca e lembra
+    for (const [scheme, want] of [['dark', 'dark'], ['light', 'light']]) {
+      ({ c, pg } = await publicPage({ scheme }));
+      await pg.locator('h1').waitFor();
+      assert.equal(await pg.evaluate(() => document.documentElement.dataset.contrast), want);
+      await c.close();
+    }
+    ({ c, pg } = await publicPage({ scheme: 'dark' }));
+    await pg.getByRole('button', { name: 'Modo sol' }).click();
+    assert.equal(await pg.evaluate(() => document.documentElement.dataset.contrast), 'light');
+    assert.equal(await pg.evaluate(() => localStorage.getItem('pt:contrast')), 'light');
+    await pg.reload();
+    await pg.getByRole('button', { name: 'Tema escuro' }).waitFor();
+    await c.close();
+    log('página pública: tema segue o aparelho (escuro/claro), "Modo sol" troca e é lembrado');
+
+    // 3) buscar, seguir ("meu jogo"), lembrar, deixar de seguir; sem armazenamento não quebra
+    ({ c, pg } = await publicPage());
+    await pg.getByLabel('Encontrar minha dupla').fill('thiago');
+    await pg.getByText('1 dupla encontrada.').waitFor();
+    assert.equal(await pg.locator('.pv-pair').count(), 1);
+    assert.ok((await pg.locator('.pv-pair').innerText()).includes(P.b));
+    await pg.getByLabel('Encontrar minha dupla').fill('zzz');
+    await pg.getByText(/Nenhuma dupla encontrada/).waitFor();
+    await pg.getByLabel('Encontrar minha dupla').fill('MATEUS');
+    const follow = pg.getByRole('button', { name: `Seguir ${P.a}` });
+    assert.equal(await follow.getAttribute('aria-pressed'), 'false');
+    await follow.click();
+    assert.equal(await follow.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(await pg.evaluate(() => JSON.parse(localStorage.getItem('pt:fav'))), { 'copa-teste': [P.a] });
+    await pg.getByLabel('Encontrar minha dupla').fill('');
+    await pg.getByRole('heading', { name: 'Meus jogos' }).waitFor();
+    const order2 = (await topics(pg)).map((t) => t.trim());
+    assert.equal(order2[0], 'Meus jogos', '"Meus jogos" vem antes de tudo: ' + order2.join(' | '));
+    assert.ok(await pg.getByText('Seu jogo').count() >= 1);
+    await pg.reload();
+    await pg.getByRole('heading', { name: 'Meus jogos' }).waitFor();
+    await pg.getByRole('button', { name: `Seguir ${P.a}` }).click();
+    await pg.getByRole('heading', { name: 'Meus jogos' }).waitFor({ state: 'detached' });
+    assert.equal(await pg.evaluate(() => localStorage.getItem('pt:fav')), '{}');
+    await c.close();
+    ({ c, pg, perrs } = await publicPage({ init: () => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('bloqueado'); } }); } }));
+    await pg.getByLabel('Encontrar minha dupla').fill('mateus');
+    await pg.getByRole('button', { name: `Seguir ${P.a}` }).click();
+    assert.equal(await pg.getByRole('button', { name: `Seguir ${P.a}` }).getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(perrs, [], 'sem localStorage a página continua funcionando');
+    await c.close();
+    log('página pública: busca por nome/sobrenome, "Seguir" (só no aparelho), "Meus jogos" no topo, lembra ao recarregar, funciona sem localStorage');
+
+    // 4) categorias: seletor, link compartilhável, 1 categoria sem seletor
+    ({ c, pg } = await publicPage());
+    const nav = pg.getByRole('navigation', { name: 'Categorias' });
+    assert.equal(await nav.getByRole('link', { name: /Masculina Open/ }).getAttribute('aria-current'), 'true', 'abre na categoria com jogo ao vivo');
+    await nav.getByRole('link', { name: 'Mista Iniciante' }).click();
+    await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
+    assert.equal(new URL(pg.url()).hash, '#categoria-cat-b');
+    await c.close();
+    ({ c, pg } = await publicPage({ hash: '#categoria-cat-b' }));
+    await pg.getByRole('heading', { level: 2, name: 'Mista Iniciante' }).waitFor();
+    await c.close();
+    ({ c, pg } = await publicPage({ variant: 'single' }));
+    await pg.locator('h1').waitFor();
+    assert.equal(await pg.getByRole('navigation', { name: 'Categorias' }).count(), 0, 'com 1 categoria não há seletor');
+    await pg.getByRole('heading', { level: 3, name: 'Mata-mata' }).waitFor();
+    await pg.getByRole('table').first().waitFor();
+    await c.close();
+    for (const w of [320, 375]) { // 8 categorias (com "ao vivo"): a faixa rola sozinha, a página não
+      ({ c, pg } = await publicPage({ variant: 'many', vp: [w, 640] }));
+      await pg.getByRole('navigation', { name: 'Categorias' }).waitFor();
+      assert.equal(await pg.getByRole('navigation', { name: 'Categorias' }).getByRole('link').count(), 8);
+      assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 1, `8 categorias alargam a página em ${w}px`);
+      assert.ok(await pg.evaluate(() => { const u = document.querySelector('.pv-catnav ul'); return u.scrollWidth > u.clientWidth; }), 'a faixa de categorias rola na horizontal');
+      await c.close();
+    }
+    log('página pública: seletor de categorias, link #categoria-<id> compartilhável, sem seletor com 1 categoria');
+
+    // 5) estados: vazio, encerrado, sem agenda, 404, erro inicial, carregando
+    ({ c, pg } = await publicPage({ variant: 'empty' }));
+    await pg.getByText(/Ainda não há chaves, horários ou resultados/).waitFor();
+    await pg.getByText('Em preparação').first().waitFor();
+    await c.close();
+    ({ c, pg } = await publicPage({ variant: 'closed' }));
+    await pg.getByText('Torneio encerrado').waitFor();
+    await pg.getByRole('heading', { name: 'Campeões' }).waitFor();
+    await pg.getByRole('heading', { name: 'Pódio' }).waitFor();
+    assert.equal(await pg.getByRole('heading', { name: 'Ao vivo agora' }).count(), 0);
+    await c.close();
+    ({ c, pg } = await publicPage({ variant: 'no-schedule' }));
+    await pg.getByRole('heading', { name: 'Próximos jogos' }).waitFor();
+    const txt = await pg.locator('body').innerText();
+    assert.ok(!/Invalid|NaN|undefined|null/.test(txt), 'sem "Invalid Date/NaN/undefined" quando a agenda está desligada');
+    await c.close();
+    ({ c, pg } = await publicPage({ status: 404 }));
+    await pg.getByRole('heading', { name: 'Torneio não encontrado' }).waitFor();
+    await c.close();
+    ({ c, pg } = await publicPage({ status: 500 }));
+    await pg.getByRole('heading', { name: 'Sem conexão' }).waitFor();
+    await pg.getByRole('button', { name: 'Tentar agora' }).waitFor();
+    await c.close();
+    ({ c, pg } = await publicPage({ delay: 600 }));
+    await pg.locator('[aria-busy="true"]').waitFor();
+    await pg.locator('h1', { hasText: 'Copa Teste' }).waitFor();
+    await c.close();
+    log('página pública: estados vazio, encerrado (campeões + pódio), sem agenda, 404, erro inicial com "Tentar agora" e carregando');
+
+    // 6) tempo real: consulta a cada ~15 s revalidando, sem pular a tela, sem conexão → aviso, volta → some
+    ({ c, pg, st: _st } = await (async () => { const r = await publicPage({ clock: true, init: () => { const f = window.fetch.bind(window); window.__cache = []; window.fetch = (u, i) => { window.__cache.push(i && i.cache); return f(u, i); }; } }); return { ...r, st: r.st }; })());
+    const st = _st;
+    await pg.locator('h1').waitFor();
+    assert.ok(st.hits.length >= 1);
+    await pg.getByText(/conferido agora/).waitFor();
+    // muda só o placar ao vivo (abaixo da dobra): nada de remontar, a rolagem continua onde estava
+    await pg.evaluate(() => { window.scrollTo(0, 300); document.querySelector('.pv-m.live').dataset.marca = 'x'; });
+    const y0 = await pg.evaluate(() => scrollY);
+    st.snap = { ...st.snap, generatedAt: new Date(Date.now() + 1000).toISOString(), categories: st.snap.categories.map((cat) => ({ ...cat, matches: cat.matches?.map((m) => (m.id === 'a-s2' ? { ...m, live: { a: 10, b: 7 } } : m)) })) };
+    const before = st.hits.length;
+    await pg.clock.runFor(16000);
+    await pg.waitForFunction(() => document.querySelector('.pv-m.live .pv-pt.cur')?.textContent === '10');
+    assert.ok(st.hits.length > before, 'consultou de novo em ~15 s');
+    assert.equal(await pg.evaluate(() => window.__cache.at(-1)), 'no-cache', 'revalida em vez de usar o cache HTTP (ETag → 304 barato)');
+    assert.equal(await pg.evaluate(() => document.querySelector('.pv-m.live').dataset.marca), 'x', 'o cartão não foi recriado');
+    assert.equal(await pg.evaluate(() => scrollY), y0, 'a tela não pulou ao atualizar');
+    // anúncio discreto: só de quem se segue
+    await pg.getByLabel('Encontrar minha dupla').fill('camila');
+    await pg.getByRole('button', { name: `Seguir ${P.e}` }).click();
+    await pg.getByLabel('Encontrar minha dupla').fill('');
+    st.snap = { ...st.snap, generatedAt: new Date(Date.now() + 2000).toISOString(), categories: st.snap.categories.map((cat) => ({ ...cat, matches: cat.matches?.map((m) => (m.id === 'b-f' ? { ...m, status: 'in_progress', live: { a: 0, b: 0 } } : m)) })) };
+    await pg.clock.runFor(16000);
+    await pg.waitForFunction(() => /Começou o jogo de/.test(document.querySelector('.pv ~ .sr-only[role=status], .pv > .sr-only[role=status]')?.textContent || ''));
+    // sem conexão: mantém os dados e avisa; ao voltar, o aviso some
+    st.mode = 'down';
+    await pg.clock.runFor(16000); await pg.clock.runFor(31000);
+    await pg.getByText(/Sem conexão\. Mostrando dados das \d\d:\d\d/).waitFor();
+    assert.ok(await pg.locator('.pv-m.live').count() >= 1, 'os dados continuam na tela offline');
+    st.mode = 'ok';
+    await pg.clock.runFor(61000);
+    await pg.getByText(/Sem conexão\. Mostrando dados/).waitFor({ state: 'detached' });
+    await c.close();
+    log('página pública: consulta ~15 s com revalidação, sem remontar nem pular a tela, anúncio só dos jogos seguidos, aviso "Sem conexão" e recuperação');
+
+    // 7) movimento reduzido
+    ({ c, pg } = await publicPage({ reducedMotion: 'reduce' }));
+    await pg.locator('.pv-dot').first().waitFor();
+    assert.equal(await pg.locator('.pv-dot').first().evaluate((e) => getComputedStyle(e).animationName), 'none');
+    await c.close();
+    log('página pública: respeita "reduzir movimento"');
   }
 
   // mobile 375px sem rolagem horizontal da página

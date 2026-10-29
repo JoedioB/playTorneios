@@ -13,7 +13,8 @@ export interface PublicMatch {
   court?: string;
   scheduledAt?: string;
   status: 'not_started' | 'in_progress' | 'finished';
-  live?: { a: number; b: number };
+  /** Pontos do set em andamento (`a`, `b`) e, em partidas por sets, os sets já fechados. */
+  live?: { a: number; b: number; sets?: Array<{ a: number; b: number }> };
   score?: { sets?: Array<{ a: number; b: number }>; points?: { a: number; b: number } };
   winner?: 'a' | 'b';
   walkover?: boolean;
@@ -84,7 +85,7 @@ export function buildPublicSnapshot(state: TournamentState, generatedAt: string)
               if (m.courtId) pm.court = state.courts[m.courtId]?.name;
               if (m.scheduledAt) pm.scheduledAt = m.scheduledAt;
             }
-            if (m.lifecycle === 'in_progress' && m.live) pm.live = { a: m.live.a, b: m.live.b };
+            if (m.lifecycle === 'in_progress' && m.live) pm.live = { a: m.live.a, b: m.live.b, ...(m.live.sets?.length ? { sets: m.live.sets.map((x) => ({ a: x.a, b: x.b })) } : {}) };
             if (sec.results && rm.result) {
               pm.score = { sets: rm.result.sets, points: rm.result.points };
               pm.winner = rm.result.winnerPairId === (rm.a.kind === 'pair' ? rm.a.pairId : '') ? 'a' : 'b';

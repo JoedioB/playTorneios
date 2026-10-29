@@ -54,7 +54,7 @@ test('o front-end não grava dados do torneio em localStorage (só preferências
   const bad: string[] = [];
   for (const f of files(join(root, 'apps/web/src'))) {
     const code = readFileSync(f, 'utf8');
-    for (const m of code.matchAll(/localStorage\.setItem\(\s*['"]([^'"]+)['"]/g)) if (!/^pt:(contrast|session|lock)$/.test(m[1] as string)) bad.push(`${relative(root, f)}: ${m[1]}`);
+    for (const m of code.matchAll(/localStorage\.setItem\(\s*['"]([^'"]+)['"]/g)) if (!/^pt:(contrast|session|lock|fav)$/.test(m[1] as string)) bad.push(`${relative(root, f)}: ${m[1]}`);
   }
   assert.deepEqual(bad, []);
 });
