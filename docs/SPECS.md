@@ -751,11 +751,15 @@ interface PublicSnapshot {
 - Manual (botão **Publicar**) ou automático ao final de um `push` bem-sucedido (`autoPublishOnSync`).
 - Cada publicação cria uma linha em `public_snapshots` com `version` crescente; a página mostra `publishedAt`.
 - **Com o admin offline, o público continua vendo a última versão publicada.** A UI do administrador mostra isso de forma explícita ("o público vê a versão das 15:02"), cumprindo a limitação do PRD §9.
-- A página consulta com `If-None-Match` a cada 30 s com a aba visível (e pausa em segundo plano).
+- A página consulta a cada **15 s** com a aba visível (decisão de 29/10/2026), com `cache: 'no-cache'` para não ficar com placar velho; pausa em segundo plano, dobra o intervalo a cada falha (até 60 s) e avisa "Sem conexão. Mostrando dados das HH:MM".
 
 ### 10.4 Acessibilidade e leitura em celular ao sol
 
-A página pública usa o mesmo sistema visual, com tema configurável e **modo claro de alto contraste** como alternativa (§11.7), já que seu uso típico é no celular ao ar livre.
+A página pública usa o mesmo sistema visual, com tema configurável. Decisões de 29/10/2026 (auditoria de UX):
+
+- **Tema:** segue o aparelho (escuro ou claro, `prefers-color-scheme`); o botão **Modo sol** troca para o tema claro de alto contraste (§11.7) e lembra a escolha, já que o uso típico é no celular ao ar livre.
+- **Fonte:** fonte do sistema, sem fontes de terceiros nem arquivos de fonte extras (mantém a página leve em rede fraca e a CSP `font-src 'self'`).
+- **Seguir uma dupla:** o nome da dupla fica só no `localStorage` do aparelho do visitante (até 6 por torneio) e nada é enviado ao servidor.
 
 ---
 
